@@ -159,15 +159,28 @@ ninguna de las partes puede alterar.
 
 ---
 
-## Stack previsto
+## Stack
 
 | Capa | Tecnología |
 |---|---|
+| Cliente | React Native (Expo) · JavaScript |
+| Plataformas | Android como mercado principal, iOS en paralelo |
+| Piso de dispositivo | Android 10+ · iOS 15+ |
 | Contratos | Soroban (Rust) |
 | Autenticación | Passkeys / smart wallets de Stellar — sin frase semilla |
 | Rendimiento | [Blend](https://www.blend.capital/) — soporta USDC, XLM, EURC y AQUA |
 | Rampa fiat | Anchors de Stellar para entrada y salida a moneda local |
-| Cliente | Móvil |
+
+Una sola identidad visual en ambas plataformas. Lo que se adapta es la
+envoltura del sistema: tipografía (SF en iOS, Roboto en Android), gesto de
+volver, barra inferior y realimentación táctil.
+
+> **Riesgo abierto:** el SDK oficial [passkey-kit](https://github.com/stellar/passkey-kit)
+> está construido sobre WebAuthn, que no existe en React Native. Las piezas
+> nativas existen ([react-native-passkey](https://www.npmjs.com/package/react-native-passkey),
+> verificación secp256r1 en Soroban desde el Protocolo 21) pero el pegamento
+> entre ambas hay que escribirlo. **Se prueba en un spike antes de construir
+> cualquier interfaz.**
 
 ### Estructura prevista
 
