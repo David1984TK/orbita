@@ -86,10 +86,13 @@ la fabrica entre desconocidos.
 
 ## Diseño
 
-Construido sobre las Human Interface Guidelines de Apple: tipografía del sistema,
-listas agrupadas, títulos grandes y un solo acento. La persona que usa esto
-ahorra $600 por semana y nunca oyó la palabra blockchain — no aparecen las
-palabras *wallet*, *gas*, *XLM* ni *frase semilla* en ninguna pantalla.
+Una sola identidad visual en Android e iOS. La persona que usa esto ahorra $600
+por semana y nunca oyó la palabra blockchain — no aparecen las palabras
+*wallet*, *gas*, *XLM* ni *frase semilla* en ninguna pantalla.
+
+Las capturas están hechas en iOS. En Android cambian la tipografía del sistema,
+el gesto de volver y la barra inferior; la rueda, los colores, la jerarquía y
+los textos son los mismos.
 
 ### La marca
 
@@ -118,7 +121,7 @@ nunca después.
 
 Si el teléfono se pierde, la llave se pierde con él. La recuperación usa el
 factor más fuerte disponible y que ningún banco tiene: **el grupo**. Dos
-integrantes confirman que sos vos, y el retiro queda congelado 72 horas por si
+integrantes confirman que eres tú, y el retiro queda congelado 72 horas por si
 alguien te suplantó.
 
 ![Pantallas de recuperación](docs/pantallas-recuperar.png)
@@ -200,4 +203,4 @@ app/           Cliente móvil
 Todo el trabajo inicial va contra **testnet**, sin dinero real, hasta contar con
 opinión legal por escrito.
 
-La documentación de negocio no se versiona acá — vive fuera del repo.
+La documentación de negocio no se versiona aquí — vive fuera del repo.
