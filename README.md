@@ -1,9 +1,13 @@
-# Órbita
+<p align="center">
+  <img src="docs/logo.svg" width="92" alt="Órbita">
+</p>
 
-Ahorro colaborativo para trabajadores informales en LatAm, sobre Stellar y
-Soroban.
+<h1 align="center">Órbita</h1>
 
-> La plataforma nunca toca el dinero — y por eso puede existir.
+<p align="center">
+  Ahorro colaborativo para trabajadores informales en LatAm, sobre Stellar y Soroban.<br>
+  <b>La plataforma nunca toca el dinero — y por eso puede existir.</b>
+</p>
 
 **Estado:** sin código todavía. Fase de diseño.
 
@@ -77,6 +81,47 @@ y un botón. Órbita patrocina las comisiones de red.
 Los círculos se forman entre personas que ya se conocen — familia, vecinos del
 mercado, compañeros de trabajo. Órbita amplifica una confianza preexistente; no
 la fabrica entre desconocidos.
+
+---
+
+## Diseño
+
+Construido sobre las Human Interface Guidelines de Apple: tipografía del sistema,
+listas agrupadas, títulos grandes y un solo acento. La persona que usa esto
+ahorra $600 por semana y nunca oyó la palabra blockchain — no aparecen las
+palabras *wallet*, *gas*, *XLM* ni *frase semilla* en ninguna pantalla.
+
+### La marca
+
+El símbolo es una **Ó cuyo acento es el turno**. Nace del nombre, y el punto
+ámbar es el mismo color que marca tu semana dentro de la app.
+
+![Marca Órbita](docs/marca.png)
+
+### Entrar
+
+Teléfono, código por WhatsApp, creación de la llave con Face ID y verificación
+de identidad. La passkey no es solo un login: **es la clave que firma las
+transacciones en la red**, y vive en el chip seguro del teléfono.
+
+![Pantallas de entrada](docs/pantallas-entrar.png)
+
+### Uso diario
+
+La rueda contesta de un vistazo las dos preguntas que importan: en qué semana
+vamos y cuándo me toca. Toda comisión se muestra desglosada antes de confirmar,
+nunca después.
+
+![Pantallas de uso diario](docs/pantallas-uso.png)
+
+### Recuperar el acceso
+
+Si el teléfono se pierde, la llave se pierde con él. La recuperación usa el
+factor más fuerte disponible y que ningún banco tiene: **el grupo**. Dos
+integrantes confirman que sos vos, y el retiro queda congelado 72 horas por si
+alguien te suplantó.
+
+![Pantallas de recuperación](docs/pantallas-recuperar.png)
 
 ---
 
