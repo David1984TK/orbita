@@ -1,10 +1,116 @@
 # Órbita
 
 Ahorro colaborativo para trabajadores informales en LatAm, sobre Stellar y
-Soroban. El dinero vive en un contrato cuyas reglas de liberación se escriben
-antes del primer depósito; la plataforma nunca lo custodia.
+Soroban.
+
+> La plataforma nunca toca el dinero — y por eso puede existir.
 
 **Estado:** sin código todavía. Fase de diseño.
+
+---
+
+## Qué es
+
+Un grupo de 5 a 15 personas que ya se conocen aporta una cuota fija cada semana.
+Cada semana, una persona recibe el total. Cuando todos cobraron, la órbita se
+completa.
+
+Es la mecánica del ahorro rotativo que ya funciona en toda Latinoamérica, con
+una diferencia: **el dinero no lo guarda nadie.** Lo retiene un contrato que
+libera fondos solo según el orden pactado.
+
+---
+
+## El problema
+
+**El ahorro rotativo se rompe siempre en el mismo punto: la custodia.** Alguien
+tiene que juntar el dinero de todos, y esa persona puede desaparecer con el
+bote. Es la razón principal por la que la gente le tiene miedo a las tandas, y
+ninguna app de notas lo resuelve.
+
+**Quien ahorra así no construye historial.** Más del 60% de los trabajadores
+informales en LatAm no tiene historial crediticio. Años de disciplina de pago no
+dejan rastro utilizable en ningún lado.
+
+**Y hay un muro regulatorio que bloquea la solución obvia.** En México
+participar en una tanda es legal, pero una plataforma que junte el dinero de sus
+usuarios cae en **captación irregular de recursos** (Art. 103 de la Ley de
+Instituciones de Crédito). La licencia que lo habilitaría —IFPE bajo la Ley
+Fintech— exige 5 millones de UDIS (≈35 millones de pesos) de capital mínimo.
+
+Por eso el problema no es construir la app. Es construirla sin custodiar.
+
+---
+
+## Cómo se resuelve
+
+El dinero vive en un contrato Soroban cuyas reglas de liberación se escriben
+antes del primer depósito, y cada usuario controla su propia llave mediante
+passkey.
+
+### Los tres mecanismos de confianza
+
+| Mecanismo | Qué hace |
+|---|---|
+| **Reputación portable** | Score on-chain no transferible ni borrable. Quien defrauda no puede estrenar identidad limpia. Exportable vía API con consentimiento: historial crediticio para quien nunca tuvo uno |
+| **Exposición neta acotada** | La posición en la rueda deja de ser sorteo y pasa a ser decisión de riesgo. Sin historial se cobra tarde o se deposita garantía; con historial limpio se cobra temprano sin depositar nada |
+| **Fondo de Protección** | Cobertura parcial (70% de la cuota incumplida, máximo dos eventos por círculo) financiada por el rendimiento de las garantías. Órbita no puede retirarlo |
+
+### La regla que gobierna los contratos
+
+```
+exposición neta = recibido − aportado − garantía
+regla:           exposición neta ≤ límite(score)
+```
+
+De ahí salen la posición asignada y el colateral exigido.
+
+### Acceso
+
+Móvil, con passkey (huella o Face ID) y sin frase semilla — soporte nativo de
+Stellar desde el Protocolo 21. El usuario nunca ve las palabras *wallet*,
+*frase semilla*, *gas* ni *XLM*: ve pesos, una rueda con el turno de cada quien,
+y un botón. Órbita patrocina las comisiones de red.
+
+### Lo que no resuelve
+
+Los círculos se forman entre personas que ya se conocen — familia, vecinos del
+mercado, compañeros de trabajo. Órbita amplifica una confianza preexistente; no
+la fabrica entre desconocidos.
+
+---
+
+## Encuadre legal
+
+**La auto-custodia no es una elección estética: es la condición que hace viable
+al producto.** Órbita no capta recursos porque estructuralmente no puede
+hacerlo — provee software, no intermediación financiera.
+
+Dos rasgos del diseño sostienen esa línea, y ninguno es negociable:
+
+1. **Órbita no paga rendimiento a sus usuarios.** La garantía se devuelve
+   íntegra y nada más. Pagar intereses a quien deposita es justamente lo que
+   caracteriza a la actividad bancaria.
+2. **El rendimiento generado por las garantías va al Fondo de Protección, y
+   Órbita no puede retirarlo en ningún caso.** Es la evidencia de que no hay
+   intermediación, no una limitación autoimpuesta.
+
+### Restricciones de lenguaje
+
+Aplican al código, a la interfaz y a cualquier material público:
+
+| Nunca | Por qué |
+|---|---|
+| "tanda", "cundina" | Cargan el estigma de las advertencias de Condusef y evocan el modelo de organizador-que-junta-el-dinero |
+| "caja de ahorro" | Término con connotación regulatoria específica (sociedades cooperativas de ahorro y préstamo) |
+| "seguro" | Actividad regulada. El Fondo de Protección es un fondo de contingencia, y así debe describirse |
+
+Se dice **círculo de ahorro**: un acuerdo entre pares ejecutado por software que
+ninguna de las partes puede alterar.
+
+> **Advertencia:** este análisis **no sustituye asesoría legal**. Debe validarse
+> con un despacho especializado en regulación financiera mexicana antes de
+> operar con dinero real.
 
 ---
 
@@ -14,11 +120,11 @@ antes del primer depósito; la plataforma nunca lo custodia.
 |---|---|
 | Contratos | Soroban (Rust) |
 | Autenticación | Passkeys / smart wallets de Stellar — sin frase semilla |
-| Rendimiento | Blend |
-| Rampa fiat | Anchors de Stellar |
+| Rendimiento | [Blend](https://www.blend.capital/) — soporta USDC, XLM, EURC y AQUA |
+| Rampa fiat | Anchors de Stellar para entrada y salida a moneda local |
 | Cliente | Móvil |
 
-## Estructura prevista
+### Estructura prevista
 
 ```
 contracts/     Contratos Soroban
@@ -29,24 +135,11 @@ contracts/     Contratos Soroban
 app/           Cliente móvil
 ```
 
-## Lógica central
-
-El contrato controla cuánto podría llevarse alguien si desapareciera hoy:
-
-```
-exposición neta = recibido − aportado − garantía
-regla:           exposición neta ≤ límite(score)
-```
-
-De ahí salen la posición en la rueda y el colateral exigido: quien no tiene
-historial cobra tarde o deposita garantía; quien lo tiene cobra temprano sin
-depositar nada.
+---
 
 ## Desarrollo
 
-Pendiente de definir. Todo el trabajo inicial va contra **testnet**, sin dinero
-real, hasta contar con opinión legal por escrito.
-
----
+Todo el trabajo inicial va contra **testnet**, sin dinero real, hasta contar con
+opinión legal por escrito.
 
 La documentación de negocio no se versiona acá — vive fuera del repo.
