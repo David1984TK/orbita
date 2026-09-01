@@ -1,1 +1,20 @@
 .DS_Store
+
+# Documentación de planificación — vive local, fuera del repo
+orbita-plan-negocio.html
+preguntas-abiertas.md
+cuestionario.md
+
+# Dependencias
+node_modules/
+target/
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Build
+dist/
+build/
+*.wasm
