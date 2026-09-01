@@ -163,7 +163,7 @@ ninguna de las partes puede alterar.
 
 | Capa | Tecnología |
 |---|---|
-| Cliente | React Native (Expo) · JavaScript |
+| Cliente | React Native (Expo) · TypeScript |
 | Plataformas | Android como mercado principal, iOS en paralelo |
 | Piso de dispositivo | Android 10+ · iOS 15+ |
 | Contratos | Soroban (Rust) |
