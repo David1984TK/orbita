@@ -198,9 +198,127 @@ app/           Cliente móvil
 
 ---
 
-## Desarrollo
+## Roadmap
 
-Todo el trabajo inicial va contra **testnet**, sin dinero real, hasta contar con
-opinión legal por escrito.
+Seis etapas ordenadas **por riesgo, no por facilidad**: lo que puede matar el
+proyecto se prueba primero. Todo corre contra **testnet** hasta que existan
+opinión legal por escrito y auditoría de los contratos.
+
+| | Etapa | Qué decide |
+|---|---|---|
+| 0 | Spike de passkeys | Si la arquitectura es viable |
+| 1 | Contratos Soroban | Si las reglas de riesgo aguantan |
+| 2 | App | Si la gente la puede usar |
+| 3 | Integraciones | Si el dinero entra y sale |
+| 4 | Piloto cerrado | Si los círculos se completan |
+| 5 | Apertura | Si el modelo escala |
+
+Sin fechas: las duraciones dependen de las horas semanales disponibles, que
+todavía no están definidas.
+
+---
+
+### Etapa 0 · Spike de passkeys
+
+**Bloqueante.** No se construye ninguna pantalla antes de que esto funcione.
+
+**Se construye** — proyecto Expo con TypeScript, contrato smart wallet
+desplegado en testnet, y el puente que hoy no existe hecho: tomar la aserción
+WebAuthn que devuelve `react-native-passkey` y formatearla para que el contrato
+la acepte.
+
+**Se prueba** — en un Android 10+ **real** o en un emulador con Google Play
+Services. Las passkeys no funcionan en un emulador pelado.
+
+**Avanza cuando** una transacción queda confirmada en testnet, firmada con la
+huella del teléfono, sin frase semilla y sin que el usuario pague gas.
+
+**Si falla** — se replantea la arquitectura antes de escribir una sola pantalla.
+La auto-custodia no es negociable: es lo que sostiene la tesis legal.
+
+---
+
+### Etapa 1 · Contratos Soroban
+
+**Se construye** — los cuatro contratos: `circulo` (aportes, turnos y
+liberación), `garantia` (colateral y exposición neta), `reputacion` (score no
+transferible) y `fondo` (Fondo de Protección).
+
+**Se prueba** — pruebas unitarias en Rust sobre los casos de borde, que son
+donde el dinero se pierde:
+
+- Alguien deja de pagar **antes** de cobrar, y **después** de cobrar
+- La garantía no alcanza y entra el fondo
+- El fondo se agota
+- Círculos de 5 y de 15 integrantes, para verificar la métrica de guardia
+- La escalera de incumplimiento completa: días 3, 7, 8 y 15
+- Que `exposición neta ≤ límite(score)` se cumpla en todas las posiciones
+
+**Avanza cuando** un ciclo completo de 15 turnos corre en testnet de principio a
+fin, incluyendo un incumplimiento y su recuperación.
+
+---
+
+### Etapa 2 · App
+
+**Se construye** — las 15 pantallas ya diseñadas: 4 de entrada, 6 de uso diario
+y 5 de recuperación.
+
+**Se prueba** — en **teléfonos reales de gama baja**, no solo en emulador: el
+público objetivo no usa equipos caros. Y con pruebas de usabilidad con personas
+del público real, nunca con programadores.
+
+**Avanza cuando** alguien que nunca vio la app completa un aporte sin ayuda y
+sin preguntar qué significa ninguna palabra de la pantalla.
+
+---
+
+### Etapa 3 · Integraciones
+
+**Se construye** — Blend para el rendimiento de las garantías, un anchor
+mexicano para la rampa de pesos, el proveedor de KYC y las notificaciones por
+WhatsApp.
+
+**Se prueba** — con dinero real en montos mínimos y únicamente entre gente del
+equipo, antes de tocar dinero ajeno.
+
+**Avanza cuando** un peso entra desde una cuenta real, da la vuelta por el
+círculo y sale a otra cuenta real.
+
+---
+
+### Etapa 4 · Piloto cerrado
+
+**Dos requisitos previos, ambos innegociables:**
+
+1. **Opinión legal por escrito** de un despacho especializado en regulación
+   financiera mexicana.
+2. **Auditoría de los contratos.** Dinero ajeno sobre código sin auditar no se
+   justifica por ninguna prisa.
+
+**Se construye** — panel de operación para dar seguimiento a los círculos
+activos y al saldo del fondo.
+
+**Se prueba** — de 10 a 20 círculos reales, con organizadores reclutados a pie.
+
+**La única métrica que importa** — la **tasa de órbitas completadas**: el
+porcentaje de círculos que terminan con todos sus integrantes cobrando. Si esa
+cifra es alta, lo demás es escalamiento; si es baja, ninguna otra métrica sirve
+de nada.
+
+---
+
+### Etapa 5 · Apertura
+
+**Se construye** — el score portable con API y consentimiento del usuario, y los
+acuerdos con cooperativas y sindicatos.
+
+**Se prueba** — la capacidad del Fondo de Protección con volumen real, vigilando
+que el promedio de `aporte al fondo ÷ pérdida potencial` se mantenga **≥ 1.0**.
+
+**Avanza cuando** el modelo se sostiene sin subsidio: el fondo se financia solo
+con el rendimiento y la comisión puede empezar a bajar.
+
+---
 
 La documentación de negocio no se versiona aquí — vive fuera del repo.
