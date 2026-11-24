@@ -218,6 +218,8 @@ Requisitos: Node 22.13 o superior, Rust con el target `wasm32v1-none`, y el
 # App
 cd app
 npm install
+npm run typecheck     # revisa los tipos
+npm test              # pruebas de la lógica del dominio
 npx expo start        # luego "a" para abrir en un Android conectado
 
 # Contratos
@@ -225,6 +227,10 @@ cd contracts
 cargo test            # pruebas de los cuatro contratos
 stellar contract build
 ```
+
+> Los contratos se compilan **siempre con `stellar contract build`**, nunca con
+> `cargo build`: `soroban-sdk` 28 se niega a compilar si no lo invoca el CLI de
+> Stellar, porque el CLI hace un postproceso que `cargo` solo no hace.
 
 ---
 
