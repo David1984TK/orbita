@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconoBiometria } from '../components/IconoBiometria';
+import { plataformaActual } from '../plataforma';
+import type { Plataforma } from '../plataforma';
 import type { ResultadoLlave } from '../servicios/llave';
 import { colors } from '../theme';
-
-type Plataforma = 'ios' | 'android';
 
 type Props = {
   /**
@@ -52,10 +52,7 @@ const GARANTIAS = [
  * Se explica por lo que significa para la persona, nunca por cómo funciona: no
  * aparecen las palabras "passkey", "wallet" ni "frase semilla".
  */
-export function LlaveScreen({
-  onCrear,
-  plataforma = Platform.OS === 'ios' ? 'ios' : 'android',
-}: Props) {
+export function LlaveScreen({ onCrear, plataforma = plataformaActual() }: Props) {
   const textos = TEXTOS[plataforma];
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);

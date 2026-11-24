@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
 import { PantallaProvisional } from '../components/PantallaProvisional';
+import { registrarAporte } from '../domain';
 import type { MiCirculo } from '../domain';
+import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
 import { colors } from '../theme';
+import { AportarScreen } from './AportarScreen';
 import { InicioScreen } from './InicioScreen';
 
 type Props = {
   circulos: Circulos;
+  aportes: Aportes;
 };
 
 type Carga =
@@ -23,10 +27,11 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
 /**
  * La app una vez dentro: la barra de pestañas y la pantalla de cada una.
  *
- * Hoy solo existe "Círculo". "Grupo" y "Perfil" son marcadores de lugar, igual
- * que "Aportar".
+ * Hoy solo existe "Círculo" (con "Aportar" dentro). "Grupo" y "Perfil" son
+ * marcadores de lugar. Mientras se aporta no se ve la barra de pestañas: es un
+ * paso corto que se confirma o se cancela.
  */
-export function PrincipalScreen({ circulos }: Props) {
+export function PrincipalScreen({ circulos, aportes }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [aportando, setAportando] = useState(false);
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
@@ -53,6 +58,34 @@ export function PrincipalScreen({ circulos }: Props) {
 
   useEffect(() => cargar(), [cargar]);
 
+  // En Android el botón de atrás cierra "Aportar" en vez de salirse de la app.
+  useEffect(() => {
+    if (!aportando) {
+      return undefined;
+    }
+    const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => {
+      setAportando(false);
+      return true;
+    });
+    return () => suscripcion.remove();
+  }, [aportando]);
+
+  // Solo se llega a "Aportar" con el círculo ya cargado.
+  const aportandoAhora = pestana === 'circulo' && aportando && carga.tipo === 'listo';
+
+  async function confirmarAporte(total: number) {
+    if (carga.tipo !== 'listo') {
+      return { ok: false, motivo: 'error' } as const;
+    }
+    const { circulo, yoId } = carga.miCirculo;
+    const resultado = await aportes.aportar(circulo.id, total);
+    if (resultado.ok) {
+      setCarga({ tipo: 'listo', miCirculo: { circulo: registrarAporte(circulo, yoId), yoId } });
+      setAportando(false);
+    }
+    return resultado;
+  }
+
   function cambiarPestana(nueva: Pestana) {
     setPestana(nueva);
     setAportando(false);
@@ -61,21 +94,22 @@ export function PrincipalScreen({ circulos }: Props) {
   return (
     <View style={estilos.pantalla}>
       <View style={estilos.contenido}>
-        {pestana === 'circulo' && aportando && (
-          <PantallaProvisional
-            texto="Aquí va «Aportar». Todavía no existe."
+        {aportandoAhora && carga.tipo === 'listo' && (
+          <AportarScreen
+            miCirculo={carga.miCirculo}
+            onConfirmar={confirmarAporte}
             onVolver={() => setAportando(false)}
           />
         )}
 
-        {pestana === 'circulo' && !aportando && carga.tipo === 'cargando' && (
+        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'cargando' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <ActivityIndicator color={colors.cobalto} />
             <Text style={estilos.mensaje}>Cargando tu círculo…</Text>
           </SafeAreaView>
         )}
 
-        {pestana === 'circulo' && !aportando && carga.tipo === 'error' && (
+        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'error' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <Text style={estilos.mensaje} accessibilityRole="alert">
               {MENSAJE_ERROR}
@@ -86,7 +120,7 @@ export function PrincipalScreen({ circulos }: Props) {
           </SafeAreaView>
         )}
 
-        {pestana === 'circulo' && !aportando && carga.tipo === 'listo' && (
+        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'listo' && (
           <InicioScreen miCirculo={carga.miCirculo} onAportar={() => setAportando(true)} />
         )}
 
@@ -99,7 +133,7 @@ export function PrincipalScreen({ circulos }: Props) {
         )}
       </View>
 
-      <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />
+      {!aportandoAhora && <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />}
     </View>
   );
 }

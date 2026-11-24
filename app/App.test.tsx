@@ -79,4 +79,20 @@ describe('App: entrada', () => {
     expect(screen.getByLabelText('Semana 6 de 15')).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
   });
+
+  it('de punta a punta: entra, aporta la cuota y Mi círculo queda al día', async () => {
+    await render(<App />);
+    await escribirTelefonoYContinuar();
+    await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+    await fireEvent.press(await screen.findByRole('button', { name: /Activar/ }));
+    await screen.findByText('Tu identidad');
+    await fireEvent.press(screen.getByRole('button', { name: 'Tomar foto de mi INE' }));
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Aportar mi cuota' }));
+    expect(screen.getByText('$603')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: /Confirmar con/ }));
+
+    expect(await screen.findByText('Ya aportaste esta semana')).toBeTruthy();
+  });
 });

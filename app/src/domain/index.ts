@@ -18,6 +18,13 @@ export {
   sumarDias,
 } from './formato';
 export {
+  COMISION_DE_DEPOSITO,
+  PORCENTAJE_DE_COMISION,
+  desgloseDeAporte,
+  registrarAporte,
+} from './aporte';
+export type { DesgloseDeAporte } from './aporte';
+export {
   fechaDeSemana,
   miIntegrante,
   resumenDeAportes,

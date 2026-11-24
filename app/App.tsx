@@ -6,6 +6,7 @@ import { IdentidadScreen } from './src/screens/IdentidadScreen';
 import { LlaveScreen } from './src/screens/LlaveScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { PrincipalScreen } from './src/screens/PrincipalScreen';
+import { crearAportes } from './src/servicios/aportes';
 import { crearCirculos } from './src/servicios/circulos';
 import { crearIdentidad } from './src/servicios/identidad';
 import { crearLlave } from './src/servicios/llave';
@@ -25,6 +26,7 @@ export default function App() {
   const llave = useMemo(() => crearLlave(), []);
   const identidad = useMemo(() => crearIdentidad(), []);
   const circulos = useMemo(() => crearCirculos(), []);
+  const aportes = useMemo(() => crearAportes(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
 
   return (
@@ -83,7 +85,7 @@ export default function App() {
         />
       )}
 
-      {paso.nombre === 'principal' && <PrincipalScreen circulos={circulos} />}
+      {paso.nombre === 'principal' && <PrincipalScreen circulos={circulos} aportes={aportes} />}
 
       <StatusBar style="dark" />
     </SafeAreaProvider>

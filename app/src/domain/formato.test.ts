@@ -55,6 +55,12 @@ describe('formatearMonto', () => {
     expect(formatearMonto(8865.05, 'pesos')).toBe('$8,865.05');
   });
 
+  it('con "centavos" siempre muestra dos decimales, también en enteros', () => {
+    expect(formatearMonto(600, 'pesos', { centavos: true })).toBe('$600.00');
+    expect(formatearMonto(9000, 'pesos', { centavos: true })).toBe('$9,000.00');
+    expect(formatearMonto(603.5, 'pesos', { centavos: true })).toBe('$603.50');
+  });
+
   it('distingue los dólares de los pesos', () => {
     expect(formatearMonto(600, 'dolares')).toBe('US$600');
   });

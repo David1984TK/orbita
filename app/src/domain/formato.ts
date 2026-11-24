@@ -60,13 +60,19 @@ export function formatearFechaConDia(iso: string): string {
 /**
  * 9000 → "$9,000"; 603.5 → "$603.50".
  *
- * Los enteros van sin centavos. Los pesos llevan "$" y los dólares "US$", para
- * que nunca se confundan en un círculo en dólares.
+ * Los enteros van sin centavos, salvo que se pida `centavos: true`, que siempre
+ * muestra dos decimales ("$600.00"): así se ven los desgloses donde las cifras
+ * van en columna. Los pesos llevan "$" y los dólares "US$", para que nunca se
+ * confundan en un círculo en dólares.
  */
-export function formatearMonto(monto: number, moneda: Moneda): string {
+export function formatearMonto(
+  monto: number,
+  moneda: Moneda,
+  opciones: { centavos?: boolean } = {},
+): string {
   const signo = monto < 0 ? '−' : '';
   const absoluto = Math.abs(monto);
-  const [enteros, centavos] = (Number.isInteger(absoluto)
+  const [enteros, centavos] = (Number.isInteger(absoluto) && opciones.centavos !== true
     ? absoluto.toString()
     : absoluto.toFixed(2)
   ).split('.');
