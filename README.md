@@ -9,7 +9,8 @@
   <b>La plataforma nunca toca el dinero — y por eso puede existir.</b>
 </p>
 
-**Estado:** sin código todavía. Fase de diseño.
+**Estado:** base del proyecto creada (app y contratos compilan). Siguiente paso:
+el spike de passkeys, Etapa 0 del [roadmap](#roadmap).
 
 ---
 
@@ -185,15 +186,44 @@ volver, barra inferior y realimentación táctil.
 > entre ambas hay que escribirlo. **Se prueba en un spike antes de construir
 > cualquier interfaz.**
 
-### Estructura prevista
+### Estructura
 
 ```
-contracts/     Contratos Soroban
-  circulo/     Ciclo de aportes, turnos y liberación
-  garantia/    Colateral y cálculo de exposición neta
-  reputacion/  Score no transferible
-  fondo/       Fondo de Protección
-app/           Cliente móvil
+app/                       Cliente móvil (Expo + TypeScript)
+  App.tsx                  Punto de entrada
+  src/
+    theme/                 Colores de la marca
+    domain/                Tipos del círculo y la regla de exposición neta
+    components/            Piezas reutilizables (el logo, por ahora)
+    screens/               Pantallas — hoy solo una de inicio provisional
+contracts/                 Workspace de Cargo para Soroban
+  contracts/
+    circulo/               Ciclo de aportes, turnos y liberación
+    garantia/              Colateral y cálculo de exposición neta
+    reputacion/            Score no transferible
+    fondo/                 Fondo de Protección
+docs/                      Logo y capturas de las pantallas
+```
+
+> Los cuatro contratos son todavía el ejemplo que genera el CLI de Stellar
+> (`hello`): compilan y pasan su prueba, pero **no tienen lógica de Órbita**. Esa
+> lógica es la Etapa 1 del roadmap.
+
+### Correr el proyecto
+
+Requisitos: Node 22.13 o superior, Rust con el target `wasm32v1-none`, y el
+[CLI de Stellar](https://developers.stellar.org/docs/tools/cli).
+
+```bash
+# App
+cd app
+npm install
+npx expo start        # luego "a" para abrir en un Android conectado
+
+# Contratos
+cd contracts
+cargo test            # pruebas de los cuatro contratos
+stellar contract build
 ```
 
 ---
