@@ -195,9 +195,9 @@ app/                       Cliente móvil (Expo + TypeScript)
   src/
     theme/                 Colores de la marca
     domain/                Tipos del círculo, exposición neta y validación del teléfono y del código
-    components/            Piezas reutilizables (el logo, por ahora)
-    screens/               Pantallas — hoy las dos primeras de entrada (teléfono y código)
-    servicios/             Verificación por WhatsApp: interfaz y versión simulada solo para desarrollo
+    components/            Piezas reutilizables (el logo y el ícono de Face ID / huella)
+    screens/               Pantallas — hoy las cuatro de entrada (teléfono, código, llave e identidad)
+    servicios/             Verificación por WhatsApp y creación de la llave: interfaz y versión simulada solo para desarrollo
 contracts/                 Workspace de Cargo para Soroban
   contracts/
     circulo/               Ciclo de aportes, turnos y liberación

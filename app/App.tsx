@@ -3,19 +3,25 @@ import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CodigoScreen } from './src/screens/CodigoScreen';
+import { IdentidadScreen } from './src/screens/IdentidadScreen';
+import { LlaveScreen } from './src/screens/LlaveScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { crearLlave } from './src/servicios/llave';
 import { crearVerificacion } from './src/servicios/verificacion';
 import { colors } from './src/theme';
 
-// Pasos de la entrada. Con tres pantallas basta un estado; cuando la app tenga
+// Pasos de la entrada. Con pocas pantallas basta un estado; cuando la app tenga
 // más pasos se cambia por una librería de navegación.
 type Paso =
   | { nombre: 'telefono' }
   | { nombre: 'codigo'; telefono: string }
-  | { nombre: 'llave' };
+  | { nombre: 'llave'; telefono: string }
+  | { nombre: 'identidad' }
+  | { nombre: 'foto-ine' };
 
 export default function App() {
   const verificacion = useMemo(() => crearVerificacion(), []);
+  const llave = useMemo(() => crearLlave(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
 
   return (
@@ -37,7 +43,7 @@ export default function App() {
           onVerificar={async (codigo) => {
             const correcto = await verificacion.verificarCodigo(paso.telefono, codigo);
             if (correcto) {
-              setPaso({ nombre: 'llave' });
+              setPaso({ nombre: 'llave', telefono: paso.telefono });
             }
             return correcto;
           }}
@@ -49,10 +55,26 @@ export default function App() {
       )}
 
       {paso.nombre === 'llave' && (
-        // Provisional: la pantalla "Tu llave" (crear la passkey) aún no existe.
+        <LlaveScreen
+          onCrear={async () => {
+            const resultado = await llave.crearLlave(paso.telefono);
+            if (resultado.ok) {
+              setPaso({ nombre: 'identidad' });
+            }
+            return resultado;
+          }}
+        />
+      )}
+
+      {paso.nombre === 'identidad' && (
+        <IdentidadScreen onTomarFoto={() => setPaso({ nombre: 'foto-ine' })} />
+      )}
+
+      {paso.nombre === 'foto-ine' && (
+        // Provisional: la captura de la INE necesita el proveedor de KYC (Etapa 3).
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <Text style={{ fontSize: 17, textAlign: 'center', color: colors.tinta }}>
-            Código verificado. Sigue la pantalla «Tu llave».
+            Aquí va la foto de tu INE. Todavía no existe.
           </Text>
         </View>
       )}

@@ -50,6 +50,31 @@ describe('App: entrada', () => {
     await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
     await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
 
-    expect(await screen.findByText(/Sigue la pantalla «Tu llave»/)).toBeTruthy();
+    expect(await screen.findByText('Crea tu llave')).toBeTruthy();
+  });
+
+  it('al crear la llave avanza a la identidad', async () => {
+    await render(<App />);
+    await escribirTelefonoYContinuar();
+    await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+    await screen.findByText('Crea tu llave');
+
+    await fireEvent.press(screen.getByRole('button', { name: /Activar/ }));
+
+    expect(await screen.findByText('Tu identidad')).toBeTruthy();
+  });
+
+  it('de la identidad pasa a la foto de la INE', async () => {
+    await render(<App />);
+    await escribirTelefonoYContinuar();
+    await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+    await fireEvent.press(await screen.findByRole('button', { name: /Activar/ }));
+    await screen.findByText('Tu identidad');
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Tomar foto de mi INE' }));
+
+    expect(await screen.findByText(/Aquí va la foto de tu INE/)).toBeTruthy();
   });
 });
