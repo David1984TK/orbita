@@ -193,9 +193,9 @@ app/                       Cliente móvil (Expo + TypeScript)
   App.tsx                  Punto de entrada
   src/
     theme/                 Colores de la marca
-    domain/                Tipos del círculo y la regla de exposición neta
+    domain/                Tipos del círculo, exposición neta y validación del teléfono
     components/            Piezas reutilizables (el logo, por ahora)
-    screens/               Pantallas — hoy solo una de inicio provisional
+    screens/               Pantallas — hoy solo la primera de entrada (el teléfono)
 contracts/                 Workspace de Cargo para Soroban
   contracts/
     circulo/               Ciclo de aportes, turnos y liberación
