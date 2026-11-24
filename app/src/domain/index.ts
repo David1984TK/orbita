@@ -5,4 +5,10 @@ export {
   normalizarTelefono,
   LARGO_TELEFONO,
 } from './telefono';
+export {
+  esCodigoCompleto,
+  formatearCuentaAtras,
+  normalizarCodigo,
+  LARGO_CODIGO,
+} from './codigo';
 export type { Circulo, Integrante, EstadoPago, Moneda } from './circulo';

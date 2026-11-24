@@ -171,6 +171,7 @@ ninguna de las partes puede alterar.
 | Plataformas | Android como mercado principal, iOS en paralelo |
 | Piso de dispositivo | Android 10+ · iOS 15+ |
 | Contratos | Soroban (Rust) |
+| Servidor | TypeScript sobre Node — se construye en la Etapa 3. Nunca guarda llaves de usuarios |
 | Autenticación | Passkeys / smart wallets de Stellar — sin frase semilla |
 | Rendimiento | [Blend](https://www.blend.capital/) — soporta USDC, XLM, EURC y AQUA |
 | Rampa fiat | Anchors de Stellar para entrada y salida a moneda local |
@@ -193,9 +194,10 @@ app/                       Cliente móvil (Expo + TypeScript)
   App.tsx                  Punto de entrada
   src/
     theme/                 Colores de la marca
-    domain/                Tipos del círculo, exposición neta y validación del teléfono
+    domain/                Tipos del círculo, exposición neta y validación del teléfono y del código
     components/            Piezas reutilizables (el logo, por ahora)
-    screens/               Pantallas — hoy solo la primera de entrada (el teléfono)
+    screens/               Pantallas — hoy las dos primeras de entrada (teléfono y código)
+    servicios/             Verificación por WhatsApp: interfaz y versión simulada solo para desarrollo
 contracts/                 Workspace de Cargo para Soroban
   contracts/
     circulo/               Ciclo de aportes, turnos y liberación
@@ -313,7 +315,8 @@ sin preguntar qué significa ninguna palabra de la pantalla.
 
 **Se construye** — Blend para el rendimiento de las garantías, un anchor
 mexicano para la rampa de pesos, el proveedor de KYC y las notificaciones por
-WhatsApp.
+WhatsApp. Aquí entra también el servidor (TypeScript sobre Node), que manda y
+verifica el código de WhatsApp y patrocina las comisiones de red.
 
 **Se prueba** — con dinero real en montos mínimos y únicamente entre gente del
 equipo, antes de tocar dinero ajeno.
