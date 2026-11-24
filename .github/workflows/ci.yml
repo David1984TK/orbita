@@ -1,0 +1,77 @@
+name: CI
+
+# Se ejecuta en cada push a main y en cada pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Si llegan dos pushes seguidos, cancela la corrida vieja: solo importa la última.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Expo 58 y React Native 0.88 exigen Node 22.13 o superior.
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # `npm ci` instala exactamente lo que dice package-lock.json y falla si el
+      # lockfile no coincide con package.json. Es lo que queremos en CI.
+      - run: npm ci
+
+      - name: Revisar tipos
+        run: npm run typecheck
+
+      - name: Pruebas
+        run: npm test
+
+  contratos:
+    name: Contratos (Soroban)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      # wasm32v1-none es el target que usa Soroban para compilar a WebAssembly.
+      - name: Instalar Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32v1-none
+
+      # soroban-sdk 28 se niega a compilar un contrato si no lo invoca el CLI de
+      # Stellar, porque el CLI hace un postproceso que `cargo` solo no hace. Por
+      # eso se instala el binario ya compilado (compilarlo tarda ~10 minutos).
+      #
+      # Se fija la versión y el sha256: si alguien alterara el archivo del
+      # release, la verificación falla en vez de ejecutar el binario.
+      - name: Instalar CLI de Stellar
+        env:
+          STELLAR_CLI_VERSION: 28.1.0
+          STELLAR_CLI_SHA256: c1680deee94301d33ada7a17f98411e642a4248c727afbd2e43050d345746462
+        run: |
+          archivo="stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o "$archivo" \
+            "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/${archivo}"
+          echo "${STELLAR_CLI_SHA256}  ${archivo}" | sha256sum --check
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "$archivo" -C "$HOME/.local/bin" stellar
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Pruebas
+        run: cargo test --workspace --locked
+
+      - name: Compilar a WebAssembly
+        run: stellar contract build

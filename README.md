@@ -234,6 +234,20 @@ stellar contract build
 > `cargo build`: `soroban-sdk` 28 se niega a compilar si no lo invoca el CLI de
 > Stellar, porque el CLI hace un postproceso que `cargo` solo no hace.
 
+### Integración continua
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) corre en cada push a
+`main` y en cada pull request:
+
+| Trabajo | Qué ejecuta |
+|---|---|
+| App | `npm ci`, revisión de tipos y pruebas |
+| Contratos | `cargo test` y `stellar contract build` |
+
+El CLI de Stellar se instala desde el binario del release, con la versión y el
+`sha256` fijados: si alguien alterara el archivo, la verificación falla en vez de
+ejecutarlo.
+
 ---
 
 ## Roadmap
