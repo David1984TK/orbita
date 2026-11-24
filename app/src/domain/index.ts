@@ -11,4 +11,18 @@ export {
   normalizarCodigo,
   LARGO_CODIGO,
 } from './codigo';
-export type { Circulo, Integrante, EstadoPago, Moneda } from './circulo';
+export {
+  formatearFecha,
+  formatearFechaConDia,
+  formatearMonto,
+  sumarDias,
+} from './formato';
+export {
+  fechaDeSemana,
+  miIntegrante,
+  resumenDeAportes,
+  resumenDeMiTurno,
+  segmentosDeLaRueda,
+} from './rueda';
+export type { EstadoSegmento, ResumenDeAportes, ResumenDeMiTurno } from './rueda';
+export type { Circulo, Integrante, EstadoPago, Moneda, MiCirculo } from './circulo';

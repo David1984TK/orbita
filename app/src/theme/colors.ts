@@ -21,6 +21,7 @@ export const colors = {
   tarjeta: '#FFFFFF',
   textoSecundario: '#585D6E',
   textoTenue: 'rgba(60, 60, 67, 0.32)', // texto de ayuda dentro de un campo vacío
+  textoInactivo: '#8A8FA0', // pestañas que no son la actual
   linea: '#DEE0E7',
   separador: 'rgba(60, 60, 67, 0.20)',
 

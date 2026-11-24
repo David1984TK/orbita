@@ -65,7 +65,7 @@ describe('App: entrada', () => {
     expect(await screen.findByText('Tu identidad')).toBeTruthy();
   });
 
-  it('de la identidad pasa a la foto de la INE', async () => {
+  it('de la identidad entra a la pantalla principal con el círculo', async () => {
     await render(<App />);
     await escribirTelefonoYContinuar();
     await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
@@ -75,6 +75,8 @@ describe('App: entrada', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: 'Tomar foto de mi INE' }));
 
-    expect(await screen.findByText(/Aquí va la foto de tu INE/)).toBeTruthy();
+    expect(await screen.findByText('Los del mercado')).toBeTruthy();
+    expect(screen.getByLabelText('Semana 6 de 15')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
   });
 });

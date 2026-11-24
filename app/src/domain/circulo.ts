@@ -22,7 +22,10 @@ export type Integrante = {
   nombre: string;
   /** Semana en la que cobra: del 1 al total de integrantes. */
   turno: number;
+  /** Cómo va con la cuota de la semana en curso. */
   estado: EstadoPago;
+  /** Cuántas cuotas lleva aportadas en total, de las `integrantes.length`. */
+  cuotasPagadas: number;
 };
 
 export type Circulo = {
@@ -34,6 +37,17 @@ export type Circulo = {
   integrantes: Integrante[];
   /** Semana en curso, empezando en 1. */
   semanaActual: number;
+  /**
+   * Día en que vence la cuota de la semana 1, como "AAAA-MM-DD". Las demás
+   * semanas vencen cada 7 días a partir de ahí.
+   */
+  inicio: string;
+};
+
+/** Un círculo visto por una de sus integrantes: `yoId` es quién mira. */
+export type MiCirculo = {
+  circulo: Circulo;
+  yoId: string;
 };
 
 /**

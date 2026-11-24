@@ -8,6 +8,7 @@ function circuloDePrueba(cuantos: number, cuotaSemanal: number): Circulo {
     nombre: `Integrante ${i + 1}`,
     turno: i + 1,
     estado: 'alDia',
+    cuotasPagadas: 1,
   }));
 
   return {
@@ -17,6 +18,7 @@ function circuloDePrueba(cuantos: number, cuotaSemanal: number): Circulo {
     cuotaSemanal,
     integrantes,
     semanaActual: 1,
+    inicio: '2026-10-26',
   };
 }
 

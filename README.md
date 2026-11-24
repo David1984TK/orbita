@@ -194,10 +194,10 @@ app/                       Cliente móvil (Expo + TypeScript)
   App.tsx                  Punto de entrada
   src/
     theme/                 Colores de la marca
-    domain/                Tipos del círculo, exposición neta y validación del teléfono y del código
-    components/            Piezas reutilizables (el logo y el ícono de Face ID / huella)
-    screens/               Pantallas — hoy las cuatro de entrada (teléfono, código, llave e identidad)
-    servicios/             Verificación por WhatsApp y creación de la llave: interfaz y versión simulada solo para desarrollo
+    domain/                Tipos del círculo, exposición neta, la rueda (semanas, turnos, fechas y montos) y validación del teléfono y del código
+    components/            Piezas reutilizables (logo, rueda, barra de pestañas, ícono de Face ID / huella)
+    screens/               Pantallas — las cuatro de entrada (teléfono, código, llave e identidad) y "Mi círculo" con su barra de pestañas
+    servicios/             Verificación por WhatsApp, llave, identidad y círculos: interfaz y versión simulada solo para desarrollo
 contracts/                 Workspace de Cargo para Soroban
   contracts/
     circulo/               Ciclo de aportes, turnos y liberación
