@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TituloDeCirculo } from '../components/SelectorDeCirculo';
 import {
   boteDelCirculo,
   estaLleno,
@@ -29,13 +30,10 @@ type Props = {
    * curso, o `null` si todavía no. Si lanza un error se vuelve a intentar.
    */
   obtenerArranque: () => Promise<MiCirculo | null>;
-  /**
-   * `true` si la app puede mostrar el círculo que arrancó como "Mi círculo". Hoy
-   * solo muestra uno: si la persona ya está en otro, todavía no.
-   */
-  puedeVerlo: boolean;
   /** La persona quiere ver su círculo ya en marcha. */
   onVerCirculo: (circulo: MiCirculo) => void;
+  /** Si se da (hay más de un círculo), el nombre abre "Mis círculos". */
+  onAbrirLista?: () => void;
   /** Si se da, muestra "‹ Volver" para regresar a donde estaba la persona. */
   onVolver?: () => void;
   /** Cada cuántos milisegundos se vuelve a consultar. */
@@ -58,8 +56,8 @@ export function FormandoScreen({
   onActualizado,
   onCompartir,
   obtenerArranque,
-  puedeVerlo,
   onVerCirculo,
+  onAbrirLista,
   onVolver,
   intervaloMs = INTERVALO_POR_DEFECTO,
 }: Props) {
@@ -181,9 +179,7 @@ export function FormandoScreen({
 
         <View style={estilos.encabezado}>
           <Text style={estilos.etiqueta}>{arranque === null ? 'EN FORMACIÓN' : 'YA ARRANCÓ'}</Text>
-          <Text style={estilos.titulo} accessibilityRole="header">
-            {circulo.nombre}
-          </Text>
+          <TituloDeCirculo nombre={circulo.nombre} onAbrirLista={onAbrirLista} />
           <Text style={estilos.subtitulo}>
             {circulo.integrantes} personas · {dinero(circulo.cuotaSemanal)} cada semana
           </Text>
@@ -336,30 +332,13 @@ export function FormandoScreen({
 
       {arranque !== null && (
         <View style={estilos.pie}>
-          {puedeVerlo ? (
-            <Pressable
-              onPress={() => onVerCirculo(arranque)}
-              accessibilityRole="button"
-              style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
-            >
-              <Text style={estilos.botonTexto}>Ver mi círculo</Text>
-            </Pressable>
-          ) : (
-            // La app todavía muestra un solo círculo: si la persona ya está en otro,
-            // este no se puede ver aquí hasta que haya una lista de círculos.
-            <>
-              <Text style={estilos.nota}>
-                Ya estás en otro círculo. Cuando puedas ver varios, este aparecerá en «Mi círculo».
-              </Text>
-              <Pressable
-                onPress={onVolver}
-                accessibilityRole="button"
-                style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
-              >
-                <Text style={estilos.botonTexto}>Entendido</Text>
-              </Pressable>
-            </>
-          )}
+          <Pressable
+            onPress={() => onVerCirculo(arranque)}
+            accessibilityRole="button"
+            style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+          >
+            <Text style={estilos.botonTexto}>Ver mi círculo</Text>
+          </Pressable>
         </View>
       )}
     </SafeAreaView>

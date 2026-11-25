@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconoBiometria } from '../components/IconoBiometria';
 import { plataformaActual } from '../plataforma';
@@ -84,7 +90,11 @@ export function LlaveScreen({ onCrear, plataforma = plataformaActual() }: Props)
   return (
     <SafeAreaView style={estilos.pantalla}>
       <View style={estilos.contenedor}>
-        <View style={estilos.contenido}>
+        <ScrollView
+          style={estilos.cuerpo}
+          contentContainerStyle={estilos.contenido}
+          keyboardShouldPersistTaps="handled"
+        >
           <View
             style={estilos.circulo}
             importantForAccessibility="no-hide-descendants"
@@ -114,7 +124,7 @@ export function LlaveScreen({ onCrear, plataforma = plataformaActual() }: Props)
               {error}
             </Text>
           )}
-        </View>
+        </ScrollView>
 
         <View style={estilos.pie}>
           <Pressable
@@ -148,8 +158,11 @@ const estilos = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  contenido: {
+  cuerpo: {
     flex: 1,
+  },
+  contenido: {
+    flexGrow: 1,
     paddingTop: 48,
     gap: 28,
   },

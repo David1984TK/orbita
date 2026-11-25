@@ -26,10 +26,11 @@ export type ResultadoDeCreacion =
 
 export type Circulos = {
   /**
-   * El círculo de la persona, o `null` si todavía no está en ninguno. Lanza un
-   * error si no se pudo consultar (sin internet, servidor caído).
+   * Los círculos en curso de la persona (puede estar en varios). Una lista vacía
+   * es que todavía no está en ninguno. Lanza un error si no se pudo consultar
+   * (sin internet, servidor caído).
    */
-  obtenerMiCirculo(): Promise<MiCirculo | null>;
+  obtenerMisCirculos(): Promise<MiCirculo[]>;
   /**
    * Crea un círculo con lo que la persona eligió, pidiendo la confirmación
    * biométrica (crear un círculo es firmar con su llave). El círculo nace "en
@@ -153,10 +154,12 @@ function identificadorDe(nombre: string): string {
 // círculo sin servidor.
 function crearSimulados(): Circulos {
   const enFormacion: CirculoEnFormacion[] = [];
+  // Los círculos que se llenaron y arrancaron: también son círculos en curso.
+  const arrancados: MiCirculo[] = [];
 
   return {
-    async obtenerMiCirculo() {
-      return circuloDeEjemplo();
+    async obtenerMisCirculos() {
+      return [circuloDeEjemplo(), ...arrancados];
     },
     async crearCirculo(borrador) {
       const numero = enFormacion.length + 1;
@@ -206,8 +209,15 @@ function crearSimulados(): Circulos {
       formacion.participantes.forEach((participante, i) => {
         turnos[participante.id] = ((i + 3) % total) + 1;
       });
-      // La primera cuota vence en una semana.
-      return arrancarCirculo(formacion, turnos, sumarDias(fechaDeHoy(), 7));
+      // La primera cuota vence en una semana. Se arranca una sola vez: las demás
+      // consultas devuelven el mismo círculo.
+      const yaArrancado = arrancados.find((c) => c.circulo.id === id);
+      if (yaArrancado !== undefined) {
+        return yaArrancado;
+      }
+      const nuevo = arrancarCirculo(formacion, turnos, sumarDias(fechaDeHoy(), 7));
+      arrancados.push(nuevo);
+      return nuevo;
     },
   };
 }
@@ -216,7 +226,7 @@ function crearSimulados(): Circulos {
 // que falla. Es a propósito: una versión instalable no debe enseñar un círculo
 // inventado como si fuera el dinero de la persona, ni decir que creó uno.
 const sinContratos: Circulos = {
-  async obtenerMiCirculo() {
+  async obtenerMisCirculos() {
     throw new Error('Todavía no hay de dónde leer los círculos.');
   },
   async crearCirculo() {

@@ -114,7 +114,10 @@ transacciones en la red**, y vive en el chip seguro del teléfono.
 
 La rueda contesta de un vistazo las dos preguntas que importan: en qué semana
 vamos y cuándo me toca. Toda comisión se muestra desglosada antes de confirmar,
-nunca después.
+nunca después. Si la persona está en más de un círculo, el nombre del círculo
+abre "Mis círculos" para cambiar de uno a otro. Las pantallas respetan la barra
+de estado, la isla y la barra de gestos del teléfono, y las de entrada hacen
+scroll en pantallas chicas.
 
 ![Pantallas de uso diario](docs/pantallas-uso.png)
 
@@ -194,9 +197,9 @@ app/                       Cliente móvil (Expo + TypeScript)
   App.tsx                  Punto de entrada
   src/
     theme/                 Colores de la marca
-    domain/                Tipos del círculo, exposición neta, la rueda (semanas, turnos, fechas y montos), el desglose del aporte y del retiro, el grupo (quién va al día), cómo se crea un círculo y cómo se llena, las reglas de la recuperación del acceso y validación del teléfono y del código
-    components/            Piezas reutilizables (logo, rueda, medidor, barra de pestañas, rayitas de progreso, ícono de Face ID / huella)
-    screens/               Pantallas — las cuatro de entrada (teléfono, código, llave e identidad), "Mi círculo" con su barra de pestañas, "Aportar", "Tu turno" (retirar), "El grupo", "Mi historial" y "Nuevo círculo", las cinco de recuperar el acceso y "Formando tu círculo"
+    domain/                Tipos del círculo, exposición neta, la rueda (semanas, turnos, fechas y montos), el desglose del aporte y del retiro, el grupo (quién va al día), cómo se crea un círculo y cómo se llena, la lista de círculos de la persona (cuál se ve, cómo se actualiza uno), las reglas de la recuperación del acceso y validación del teléfono y del código
+    components/            Piezas reutilizables (logo, rueda, medidor, barra de pestañas, avisos flotantes en pila, selector de círculo, margen de abajo para la barra de gestos, rayitas de progreso, ícono de Face ID / huella)
+    screens/               Pantallas — las cuatro de entrada (teléfono, código, llave e identidad), "Mi círculo" con su barra de pestañas, "Aportar", "Tu turno" (retirar), "El grupo", "Mi historial", "Nuevo círculo" y "Mis círculos", las cinco de recuperar el acceso y "Formando tu círculo"
     servicios/             Verificación por WhatsApp, llave, identidad, círculos, aportes, retiros, historial, recuperación y compartir: interfaz y versión simulada solo para desarrollo
 contracts/                 Workspace de Cargo para Soroban
   contracts/

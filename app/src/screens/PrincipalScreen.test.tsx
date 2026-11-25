@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { BackHandler } from 'react-native';
+import { BackHandler, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import { arrancarCirculo } from '../domain';
@@ -53,7 +54,7 @@ function recuperacionCon(solicitud: SolicitudDeRecuperacion | null): Recuperacio
 }
 
 async function abrir(
-  obtener: () => Promise<MiCirculo | null> = async () => circuloDeEjemplo(),
+  obtener: () => Promise<MiCirculo | MiCirculo[] | null> = async () => circuloDeEjemplo(),
   aportar: Aportes['aportar'] = async () => ({ ok: true }),
   retirar: Retiros['retirar'] = async () => ({ ok: true }),
   crear: Circulos['crearCirculo'] = async (): Promise<ResultadoDeCreacion> => ({
@@ -66,7 +67,13 @@ async function abrir(
   arranque: MiCirculo | null = null,
 ) {
   const circulos: Circulos = {
-    obtenerMiCirculo: jest.fn(obtener),
+    obtenerMisCirculos: jest.fn(async () => {
+      const respuesta = await obtener();
+      if (respuesta === null) {
+        return [];
+      }
+      return Array.isArray(respuesta) ? respuesta : [respuesta];
+    }),
     crearCirculo: jest.fn(crear),
     obtenerCirculosEnFormacion: jest.fn(async () => formando),
     obtenerEnFormacion: jest.fn(
@@ -150,7 +157,7 @@ describe('PrincipalScreen', () => {
 
     await fireEvent.press(pestana('Círculo'));
     expect(screen.getByText('Los del mercado')).toBeTruthy();
-    expect(circulos.obtenerMiCirculo).toHaveBeenCalledTimes(1);
+    expect(circulos.obtenerMisCirculos).toHaveBeenCalledTimes(1);
   });
 
   it('"Aportar mi cuota" abre la pantalla de aportar, sin la barra de pestañas', async () => {
@@ -238,7 +245,7 @@ describe('PrincipalScreen', () => {
     await fireEvent.press(pestana('Grupo'));
 
     expect(screen.getByText('Semana 6 · 13 al día, 1 pendiente, 1 atrasado')).toBeTruthy();
-    expect(circulos.obtenerMiCirculo).toHaveBeenCalledTimes(1);
+    expect(circulos.obtenerMisCirculos).toHaveBeenCalledTimes(1);
   });
 
   it('al aportar, la pestaña Grupo ya me ve al día', async () => {
@@ -675,20 +682,21 @@ describe('PrincipalScreen', () => {
         expect(screen.getByLabelText('Rosa Martínez, Turno 1, Pendiente')).toBeTruthy();
       });
 
-      it('si ya está en otro círculo no lo reemplaza: avisa y sigue mostrando el que tenía', async () => {
+      it('con otro círculo en curso, el que arrancó se suma y pasa a ser el que se ve', async () => {
         await abrir(undefined, undefined, undefined, undefined, null, [lleno()], undefined, enCurso());
         await screen.findByText('Los del mercado');
         await fireEvent.press(await screen.findByRole('button', { name: /Tu círculo Las del taller ya arrancó/ }));
         expect(await screen.findByText('¡Tu círculo arrancó!')).toBeTruthy();
 
-        expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
-        expect(screen.getByText(/Ya estás en otro círculo/)).toBeTruthy();
+        await fireEvent.press(screen.getByRole('button', { name: 'Ver mi círculo' }));
 
-        await fireEvent.press(screen.getByRole('button', { name: 'Entendido' }));
-
-        expect(screen.getByText('Los del mercado')).toBeTruthy();
-        expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
-        expect(screen.queryByText('Las del taller')).toBeNull();
+        // Ahora se ve el nuevo...
+        expect(await screen.findByText('Las del taller')).toBeTruthy();
+        expect(screen.getByLabelText('Semana 1 de 5')).toBeTruthy();
+        // ...y el que ya tenía sigue en la lista de círculos.
+        await fireEvent.press(screen.getByRole('button', { name: 'Las del taller. Cambiar de círculo.' }));
+        expect(screen.getByRole('button', { name: /Los del mercado\. Semana 6 de 15/ })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Las del taller\. Semana 1 de 5/ })).toBeTruthy();
       });
 
       it('mientras no arranca, la pantalla dice que está arrancando y no ofrece verlo', async () => {
@@ -724,7 +732,7 @@ describe('PrincipalScreen', () => {
   describe('después de recuperar el acceso', () => {
     it('el retiro queda en espera hasta la fecha que llega de la recuperación', async () => {
       const circulos: Circulos = {
-        obtenerMiCirculo: jest.fn(async () => enMiTurno()),
+        obtenerMisCirculos: jest.fn(async () => [enMiTurno()]),
         crearCirculo: jest.fn(),
         obtenerCirculosEnFormacion: jest.fn(async () => []),
         obtenerEnFormacion: jest.fn(),
@@ -915,6 +923,264 @@ describe('PrincipalScreen', () => {
         jest.advanceTimersByTime(6100);
       });
       expect(screen.queryByText(textoDelAviso)).toBeNull();
+    });
+  });
+
+  describe('varios círculos', () => {
+    // Un segundo círculo en curso: "Las del taller", 5 personas, $500, semana 1.
+    function delTaller(): MiCirculo {
+      return arrancarCirculo(
+        formacionDeEjemplo({
+          id: 'las-del-taller',
+          nombre: 'Las del taller',
+          integrantes: 5,
+          cuotaSemanal: 500,
+          participantes: [
+            { id: 'yo', nombre: 'David Nava' },
+            { id: 'a', nombre: 'Rosa Martínez' },
+            { id: 'b', nombre: 'Julio Lara' },
+            { id: 'c', nombre: 'Ana Torres' },
+            { id: 'd', nombre: 'Carmen Ruiz' },
+          ],
+        }),
+        { yo: 4, a: 1, b: 2, c: 3, d: 5 },
+        '2026-12-07',
+      );
+    }
+    const dos = async () => [circuloDeEjemplo(), delTaller()];
+    const selector = (nombre: string) =>
+      screen.getByRole('button', { name: `${nombre}. Cambiar de círculo.` });
+
+    it('con un solo círculo no hay nada que cambiar: el nombre es solo un título', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+
+      expect(screen.queryByRole('button', { name: /Cambiar de círculo/ })).toBeNull();
+    });
+
+    it('con varios, empieza viendo el primero y su nombre abre la lista de círculos', async () => {
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+
+      await fireEvent.press(selector('Los del mercado'));
+
+      expect(screen.getByText('Mis círculos')).toBeTruthy();
+      expect(screen.getByText('EN CURSO')).toBeTruthy();
+      expect(screen.getByText('Semana 6 de 15 · $600 cada semana')).toBeTruthy();
+      expect(screen.getByText('Semana 1 de 5 · $500 cada semana')).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+    });
+
+    it('elegir otro círculo lo muestra en "Mi círculo", con la barra de pestañas', async () => {
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+
+      await fireEvent.press(screen.getByRole('button', { name: /Las del taller\. Semana 1 de 5/ }));
+
+      expect(screen.getByText('5 personas · $500 cada semana')).toBeTruthy();
+      expect(screen.getByLabelText('Semana 1 de 5')).toBeTruthy();
+      expect(screen.getByText('Te toca en la semana 4')).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Círculo' }).props.accessibilityState.selected).toBe(true);
+    });
+
+    it('la pestaña Grupo muestra el círculo elegido y su nombre abre la lista', async () => {
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+      await fireEvent.press(screen.getByRole('button', { name: /Las del taller\. Semana 1 de 5/ }));
+
+      await fireEvent.press(pestana('Grupo'));
+
+      expect(screen.getByText('LOS 5 INTEGRANTES')).toBeTruthy();
+      expect(screen.getByLabelText('Rosa Martínez, Turno 1, Pendiente')).toBeTruthy();
+      await fireEvent.press(selector('Las del taller'));
+      expect(screen.getByText('Mis círculos')).toBeTruthy();
+    });
+
+    it('lo que se hace en un círculo no toca a los demás: aportar en uno deja el otro pendiente', async () => {
+      const { aportes } = await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+      await fireEvent.press(screen.getByRole('button', { name: /Las del taller\. Semana 1 de 5/ }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aportar mi cuota' }));
+      await fireEvent.press(screen.getByRole('button', { name: /Confirmar con/ }));
+
+      // Aportó al del taller: $500 más la comisión de depósito, no los $600 del otro.
+      expect(aportes.aportar).toHaveBeenCalledWith('las-del-taller', 502.5);
+      expect(await screen.findByText('Ya aportaste esta semana')).toBeTruthy();
+
+      await fireEvent.press(selector('Las del taller'));
+      await fireEvent.press(screen.getByRole('button', { name: /Los del mercado\. Semana 6 de 15/ }));
+
+      expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Aportar mi cuota' })).toBeTruthy();
+    });
+
+    it('"Volver" en la lista regresa sin cambiar de círculo', async () => {
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+    });
+
+    it('la lista también tiene los que se están llenando, y tocar uno lo abre', async () => {
+      await abrir(dos, undefined, undefined, undefined, null, [
+        formacionDeEjemplo({ id: 'barrio', nombre: 'Las del barrio' }),
+      ]);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+      expect(screen.getByText('SE ESTÁN LLENANDO')).toBeTruthy();
+
+      await fireEvent.press(screen.getByRole('button', { name: /Las del barrio/ }));
+
+      expect(screen.getByText('EN FORMACIÓN')).toBeTruthy();
+      expect(screen.getByText('Faltan 9 personas')).toBeTruthy();
+    });
+
+    it('con un círculo en curso y otro llenándose también hay algo que elegir', async () => {
+      await abrir(undefined, undefined, undefined, undefined, null, [
+        formacionDeEjemplo({ id: 'barrio', nombre: 'Las del barrio' }),
+      ]);
+      await screen.findByText('15 personas · $600 cada semana');
+
+      expect(selector('Los del mercado')).toBeTruthy();
+    });
+
+    it('"Crear un círculo" en la lista abre la creación', async () => {
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear un círculo' }));
+
+      expect(screen.getByText('Nuevo círculo')).toBeTruthy();
+    });
+
+    it('sin círculo en curso y con varios llenándose, el nombre también abre la lista', async () => {
+      await abrir(async () => null, undefined, undefined, undefined, null, [
+        formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
+        formacionDeEjemplo({ id: 'dos', nombre: 'Segundo' }),
+      ]);
+
+      await fireEvent.press(await screen.findByRole('button', { name: 'Segundo. Cambiar de círculo.' }));
+
+      expect(screen.getByText('Mis círculos')).toBeTruthy();
+      expect(screen.getByText('Primero')).toBeTruthy();
+      expect(screen.getByText('Segundo')).toBeTruthy();
+    });
+
+    it('el botón de atrás de Android cierra la lista', async () => {
+      let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
+      const espia = jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_evento, manejador) => {
+          atras = manejador;
+          return { remove: jest.fn() };
+        });
+      await abrir(dos);
+      await screen.findByText('15 personas · $600 cada semana');
+      await fireEvent.press(selector('Los del mercado'));
+      expect(screen.getByText('Mis círculos')).toBeTruthy();
+
+      await act(async () => {
+        expect(atras({} as never)).toBe(true);
+      });
+
+      expect(screen.queryByText('Mis círculos')).toBeNull();
+      expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
+      espia.mockRestore();
+    });
+
+    it('al recuperar el acceso, el retiro queda en espera en todos los círculos', async () => {
+      const enSuTurno = (id: string, nombre: string): MiCirculo => {
+        const base = enMiTurno();
+        return { ...base, circulo: { ...base.circulo, id, nombre } };
+      };
+      const circulosMock: Circulos = {
+        obtenerMisCirculos: jest.fn(async () => [enSuTurno('uno', 'Uno'), enSuTurno('dos', 'Dos')]),
+        crearCirculo: jest.fn(),
+        obtenerCirculosEnFormacion: jest.fn(async () => []),
+        obtenerEnFormacion: jest.fn(),
+        obtenerArranque: jest.fn(),
+      };
+      await render(
+        <PrincipalScreen
+          circulos={circulosMock}
+          aportes={{ aportar: jest.fn(async () => ({ ok: true }) as const) }}
+          retiros={{ retirar: jest.fn(async () => ({ ok: true }) as const) }}
+          historiales={{ obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) }}
+          recuperacion={recuperacionCon(null)}
+          compartir={{ compartir: jest.fn(async () => 'compartido' as const) }}
+          retiroCongeladoHasta={new Date(Date.now() + 72 * 3600 * 1000).toISOString()}
+        />,
+      );
+
+      expect((await screen.findByRole('button', { name: 'Retirar mi dinero' })).props.accessibilityState.disabled).toBe(true);
+      await fireEvent.press(screen.getByRole('button', { name: 'Uno. Cambiar de círculo.' }));
+      await fireEvent.press(screen.getByRole('button', { name: /^Dos\./ }));
+
+      expect(screen.getByRole('button', { name: 'Retirar mi dinero' }).props.accessibilityState.disabled).toBe(true);
+    });
+  });
+
+  describe('espacio que se queda el sistema (barra de gestos, botones)', () => {
+    // Un teléfono con barra de gestos abajo: el sistema se queda 34 puntos.
+    const METRICAS = {
+      frame: { x: 0, y: 0, width: 390, height: 844 },
+      insets: { top: 54, left: 0, right: 0, bottom: 34 },
+    };
+    const margen = () => StyleSheet.flatten(screen.getByTestId('margen-inferior').props.style).paddingBottom;
+
+    async function abrirEnTelefono() {
+      await render(
+        <SafeAreaProvider initialMetrics={METRICAS}>
+          <PrincipalScreen
+            circulos={{
+              obtenerMisCirculos: jest.fn(async () => [circuloDeEjemplo()]),
+              crearCirculo: jest.fn(),
+              obtenerCirculosEnFormacion: jest.fn(async () => []),
+              obtenerEnFormacion: jest.fn(),
+              obtenerArranque: jest.fn(),
+            }}
+            aportes={{ aportar: jest.fn(async () => ({ ok: true }) as const) }}
+            retiros={{ retirar: jest.fn(async () => ({ ok: true }) as const) }}
+            historiales={{ obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) }}
+            recuperacion={recuperacionCon(null)}
+            compartir={{ compartir: jest.fn(async () => 'compartido' as const) }}
+          />
+        </SafeAreaProvider>,
+      );
+      await screen.findByText('Los del mercado');
+    }
+
+    it('con la barra de pestañas no suma margen: la barra ya se apoya en él', async () => {
+      await abrirEnTelefono();
+
+      expect(margen()).toBe(0);
+    });
+
+    it('en una pantalla sin barra de pestañas deja libre el espacio de abajo', async () => {
+      await abrirEnTelefono();
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aportar mi cuota' }));
+
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+      expect(margen()).toBe(34);
+    });
+
+    it('al volver a la barra de pestañas, el margen se quita', async () => {
+      await abrirEnTelefono();
+      await fireEvent.press(screen.getByRole('button', { name: 'Aportar mi cuota' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(margen()).toBe(0);
     });
   });
 });

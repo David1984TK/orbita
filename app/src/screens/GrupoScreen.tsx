@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PastillaDeCirculo } from '../components/SelectorDeCirculo';
 import {
   etiquetaDeEstado,
   iniciales,
@@ -15,6 +16,8 @@ type Props = {
   miCirculo: MiCirculo;
   /** La persona quiere crear otro círculo, además de este. */
   onCrearOtro: () => void;
+  /** Si se da (hay más de un círculo), una pastilla con el nombre abre "Mis círculos". */
+  onAbrirLista?: () => void;
 };
 
 type TonoDeAvatar = 'yo' | 'cobra' | 'normal';
@@ -77,7 +80,7 @@ function Fila({
  * ambigüedad: es la vigilancia mutua que el cuaderno de la tanda tiene
  * desordenada.
  */
-export function GrupoScreen({ miCirculo, onCrearOtro }: Props) {
+export function GrupoScreen({ miCirculo, onCrearOtro, onAbrirLista }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
   const cobra = quienCobra(circulo);
@@ -89,6 +92,10 @@ export function GrupoScreen({ miCirculo, onCrearOtro }: Props) {
   return (
     <SafeAreaView edges={['top']} style={estilos.pantalla}>
       <ScrollView contentContainerStyle={estilos.contenido}>
+        {onAbrirLista !== undefined && (
+          <PastillaDeCirculo nombre={circulo.nombre} onAbrirLista={onAbrirLista} />
+        )}
+
         <View style={estilos.encabezado}>
           <Text style={estilos.titulo} accessibilityRole="header">
             El grupo

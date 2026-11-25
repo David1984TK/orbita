@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PilaDeAvisos } from '../components/PilaDeAvisos';
+import { TituloDeCirculo } from '../components/SelectorDeCirculo';
 import type { Aviso } from '../components/PilaDeAvisos';
 import { Rueda } from '../components/Rueda';
 import {
@@ -42,6 +43,8 @@ type Props = {
   avisosMostrados?: string[];
   /** Estos avisos ya se mostraron: para que no vuelvan a salir al volver a esta pantalla. */
   onAvisosMostrados?: (ids: string[]) => void;
+  /** Si se da (hay más de un círculo), el nombre del círculo abre "Mis círculos". */
+  onAbrirLista?: () => void;
 };
 
 function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
@@ -82,6 +85,7 @@ export function InicioScreen({
   onVerFormacion,
   avisosMostrados = [],
   onAvisosMostrados,
+  onAbrirLista,
 }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
@@ -136,9 +140,7 @@ export function InicioScreen({
       <View style={estilos.raiz}>
         <ScrollView contentContainerStyle={estilos.contenido}>
           <View style={estilos.encabezado}>
-            <Text style={estilos.titulo} accessibilityRole="header">
-              {circulo.nombre}
-            </Text>
+            <TituloDeCirculo nombre={circulo.nombre} onAbrirLista={onAbrirLista} />
             <Text style={estilos.subtitulo}>
               {total} personas · {formatearMonto(circulo.cuotaSemanal, circulo.moneda)} cada semana
             </Text>
@@ -274,12 +276,6 @@ const estilos = StyleSheet.create({
   },
   encabezado: {
     gap: 6,
-  },
-  titulo: {
-    fontSize: 32,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-    color: colors.tinta,
   },
   subtitulo: {
     fontSize: 15,

@@ -18,7 +18,7 @@ describe('círculo de ejemplo (solo desarrollo)', () => {
   });
 
   it('se entrega por la interfaz en desarrollo', async () => {
-    await expect(crearCirculos(true).obtenerMiCirculo()).resolves.toEqual(circuloDeEjemplo());
+    await expect(crearCirculos(true).obtenerMisCirculos()).resolves.toEqual([circuloDeEjemplo()]);
   });
 });
 
@@ -168,6 +168,32 @@ describe('crear un círculo', () => {
     it('preguntar por un círculo que no existe lanza un error', async () => {
       await expect(crearCirculos(true).obtenerArranque('no-existe')).rejects.toThrow(/no-existe/);
     });
+
+    it('el círculo que arrancó pasa a ser uno de mis círculos, junto al que ya tenía', async () => {
+      const { circulos, id } = await llenado();
+      await circulos.obtenerArranque(id);
+
+      const mios = await circulos.obtenerMisCirculos();
+
+      expect(mios.map((m) => m.circulo.id)).toEqual(['los-del-mercado', id]);
+    });
+
+    it('arrancar es una sola vez: preguntar de nuevo devuelve el mismo círculo y no lo duplica', async () => {
+      const { circulos, id } = await llenado();
+
+      const primero = await circulos.obtenerArranque(id);
+      const segundo = await circulos.obtenerArranque(id);
+
+      expect(segundo).toBe(primero);
+      expect(await circulos.obtenerMisCirculos()).toHaveLength(2);
+    });
+
+    it('antes de arrancar no aparece entre mis círculos', async () => {
+      const circulos = crearCirculos(true);
+      await circulos.crearCirculo(borrador);
+
+      expect(await circulos.obtenerMisCirculos()).toHaveLength(1);
+    });
   });
 
   it('pedir el avance de un círculo que no existe lanza un error', async () => {
@@ -177,7 +203,7 @@ describe('crear un círculo', () => {
 
 describe('círculos fuera de desarrollo', () => {
   it('nunca enseña un círculo inventado: falla por no haber de dónde leerlo', async () => {
-    await expect(crearCirculos(false).obtenerMiCirculo()).rejects.toThrow();
+    await expect(crearCirculos(false).obtenerMisCirculos()).rejects.toThrow();
   });
 
   it('nunca enseña círculos en formación inventados', async () => {

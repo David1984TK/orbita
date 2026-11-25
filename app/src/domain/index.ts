@@ -94,6 +94,12 @@ export {
   textoDeFaltantes as textoDeFaltantesDelCirculo,
 } from './formacion';
 export type { CirculoEnFormacion, Lugar, Participante } from './formacion';
+export {
+  conCirculoActualizado,
+  conCirculoAgregado,
+  elegirActual,
+  enFormacionPendientes,
+} from './misCirculos';
 export { fraccionDelPuntaje } from './historial';
 export type { Historial, Nivel } from './historial';
 export type { Circulo, Integrante, EstadoPago, Moneda, MiCirculo } from './circulo';

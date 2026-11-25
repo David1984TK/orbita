@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -52,7 +53,11 @@ export function LoginScreen({ onContinuar, onRecuperar }: Props) {
         style={estilos.teclado}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={estilos.centro}>
+        <ScrollView
+          style={estilos.cuerpo}
+          contentContainerStyle={estilos.centro}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={estilos.marca}>
             <Marca tamano={72} />
             <Text style={estilos.nombre}>Órbita</Text>
@@ -79,7 +84,7 @@ export function LoginScreen({ onContinuar, onRecuperar }: Props) {
               accessibilityLabel="Número de teléfono celular, 10 dígitos"
             />
           </View>
-        </View>
+        </ScrollView>
 
         <View style={estilos.pie}>
           <Pressable
@@ -121,8 +126,11 @@ const estilos = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  centro: {
+  cuerpo: {
     flex: 1,
+  },
+  centro: {
+    flexGrow: 1,
     justifyContent: 'center',
     gap: 28,
   },

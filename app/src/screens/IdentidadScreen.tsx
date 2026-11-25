@@ -1,4 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Progreso } from '../components/Progreso';
 import { colors } from '../theme';
@@ -28,7 +34,11 @@ export function IdentidadScreen({ onTomarFoto }: Props) {
   return (
     <SafeAreaView style={estilos.pantalla}>
       <View style={estilos.contenedor}>
-        <View style={estilos.contenido}>
+        <ScrollView
+          style={estilos.cuerpo}
+          contentContainerStyle={estilos.contenido}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={estilos.encabezado}>
             <Text style={estilos.titulo} accessibilityRole="header">
               Tu identidad
@@ -71,7 +81,7 @@ export function IdentidadScreen({ onTomarFoto }: Props) {
               integrantes de tu círculo.
             </Text>
           </View>
-        </View>
+        </ScrollView>
 
         <View style={estilos.pie}>
           <Pressable
@@ -97,8 +107,11 @@ const estilos = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  contenido: {
+  cuerpo: {
     flex: 1,
+  },
+  contenido: {
+    flexGrow: 1,
     paddingTop: 24,
     gap: 20,
   },

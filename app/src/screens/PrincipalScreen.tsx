@@ -3,7 +3,16 @@ import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
-import { ponerEsperaDeRetiro, registrarAporte, registrarRetiro } from '../domain';
+import { ConMargenInferior } from '../components/ConMargenInferior';
+import {
+  conCirculoActualizado,
+  conCirculoAgregado,
+  elegirActual,
+  enFormacionPendientes,
+  ponerEsperaDeRetiro,
+  registrarAporte,
+  registrarRetiro,
+} from '../domain';
 import type { BorradorDeCirculo, CirculoEnFormacion, MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
@@ -13,6 +22,7 @@ import type { Recuperacion, RespuestaASolicitud, SolicitudDeRecuperacion } from 
 import type { Retiros } from '../servicios/retiros';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
+import { CirculosScreen } from './CirculosScreen';
 import { ConfirmarIdentidadScreen } from './ConfirmarIdentidadScreen';
 import { FormandoScreen } from './FormandoScreen';
 import { GrupoScreen } from './GrupoScreen';
@@ -32,35 +42,32 @@ type Props = {
   compartir: Compartir;
   /**
    * Si la persona acaba de recuperar su acceso: hasta cuándo no puede retirar
-   * dinero (fecha y hora ISO). Se aplica al círculo al cargarlo, mientras el
-   * servidor no lo entregue ya con la espera.
+   * dinero (fecha y hora ISO). Se aplica a sus círculos al cargarlos, mientras el
+   * servidor no los entregue ya con la espera.
    */
   retiroCongeladoHasta?: string;
 };
 
 /**
  * La pantalla de la pestaña o uno de los pasos cortos que se abren encima:
- * aportar, retirar y responder a una solicitud de recuperación (desde "Círculo")
- * y crear un círculo (desde la pantalla vacía o desde "Grupo"). "formando" es el
- * círculo recién creado, que todavía se está llenando.
+ * aportar, retirar y responder a una solicitud de recuperación (desde "Círculo"),
+ * ver la lista de círculos y crear uno (desde "Círculo" o "Grupo"). "formando" es
+ * un círculo que todavía se está llenando.
  */
-type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'formando' | 'solicitud';
+type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'formando' | 'solicitud' | 'circulos';
 
-type Carga =
-  | { tipo: 'cargando' }
-  | { tipo: 'listo'; miCirculo: MiCirculo }
-  | { tipo: 'sinCirculo' }
-  | { tipo: 'error' };
+/** Si ya se cargaron los círculos. La lista misma vive aparte; vacía es "ninguno". */
+type Carga = 'cargando' | 'listo' | 'error';
 
 const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e inténtalo de nuevo.';
 
 /**
  * La app una vez dentro: la barra de pestañas y la pantalla de cada una.
  *
- * Existen "Círculo" (con "Aportar" y "Tu turno" dentro), "Grupo" y "Perfil" (mi
- * historial). "Círculo" y "Grupo" leen el mismo círculo, así que comparten la
- * carga y sus avisos; "Perfil" pide su propio historial. Mientras se aporta, se
- * retira o se crea un círculo no se ve la barra de pestañas: son pasos cortos
+ * La persona puede estar en varios círculos. "Círculo" (con "Aportar" y "Tu
+ * turno" dentro) y "Grupo" muestran el que tiene elegido, y "Mis círculos" deja
+ * cambiarlo. "Perfil" pide su propio historial. Mientras se aporta, se retira, se
+ * crea un círculo o se elige uno no se ve la barra de pestañas: son pasos cortos
  * que se confirman o se cancelan.
  */
 export function PrincipalScreen({
@@ -74,7 +81,10 @@ export function PrincipalScreen({
 }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [vista, setVista] = useState<Vista>('inicio');
-  const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
+  const [carga, setCarga] = useState<Carga>('cargando');
+  // Los círculos en curso de la persona, y cuál está viendo.
+  const [activos, setActivos] = useState<MiCirculo[]>([]);
+  const [actualId, setActualId] = useState<string | null>(null);
   const [solicitud, setSolicitud] = useState<SolicitudDeRecuperacion | null>(null);
   // Los círculos que la persona creó y todavía se están llenando, y cuál está
   // viendo en este momento.
@@ -85,35 +95,38 @@ export function PrincipalScreen({
   // avisos no deben volver a salir cada vez que la persona regresa.
   const [avisosMostrados, setAvisosMostrados] = useState<string[]>([]);
 
+  // Después de recuperar el acceso, el retiro queda en espera en todos los círculos.
+  const conEspera = useCallback(
+    (miCirculo: MiCirculo): MiCirculo =>
+      retiroCongeladoHasta === undefined
+        ? miCirculo
+        : {
+            circulo: ponerEsperaDeRetiro(miCirculo.circulo, miCirculo.yoId, retiroCongeladoHasta),
+            yoId: miCirculo.yoId,
+          },
+    [retiroCongeladoHasta],
+  );
+
   const cargar = useCallback(() => {
     let cancelado = false;
-    setCarga({ tipo: 'cargando' });
+    setCarga('cargando');
     circulos
-      .obtenerMiCirculo()
-      .then((miCirculo) => {
+      .obtenerMisCirculos()
+      .then((lista) => {
         if (!cancelado) {
-          if (miCirculo === null) {
-            setCarga({ tipo: 'sinCirculo' });
-          } else if (retiroCongeladoHasta !== undefined) {
-            const { circulo, yoId } = miCirculo;
-            setCarga({
-              tipo: 'listo',
-              miCirculo: { circulo: ponerEsperaDeRetiro(circulo, yoId, retiroCongeladoHasta), yoId },
-            });
-          } else {
-            setCarga({ tipo: 'listo', miCirculo });
-          }
+          setActivos(lista.map(conEspera));
+          setCarga('listo');
         }
       })
       .catch(() => {
         if (!cancelado) {
-          setCarga({ tipo: 'error' });
+          setCarga('error');
         }
       });
     return () => {
       cancelado = true;
     };
-  }, [circulos, retiroCongeladoHasta]);
+  }, [circulos, conEspera]);
 
   useEffect(() => cargar(), [cargar]);
 
@@ -166,22 +179,33 @@ export function PrincipalScreen({
   // "Círculo" y "Grupo" se alimentan del mismo círculo.
   const necesitaCirculo = pestana === 'circulo' || pestana === 'grupo';
 
+  // El círculo en curso que se está viendo, si hay alguno.
+  const actual = elegirActual(activos, actualId);
+  const sinCirculo = carga === 'listo' && actual === null;
+  // Los que se llenan, sin los que ya aparecen en curso (cuando uno arranca puede
+  // estar en las dos listas un momento).
+  const llenandose = enFormacionPendientes(enFormacion, activos);
+  // Con más de un círculo (en curso o llenándose) hay algo que elegir.
+  const hayVarios = activos.length + llenandose.length >= 2;
+
   // El círculo en formación que se está viendo, si existe.
-  const viendoFormacion = enFormacion.find((c) => c.id === formandoId) ?? null;
+  const viendoFormacion = llenandose.find((c) => c.id === formandoId) ?? null;
   // Sin un círculo en curso, la pantalla de "Círculo" y "Grupo" es el círculo que
   // se está llenando (el más reciente), si hay alguno.
   const formacionPrincipal =
-    carga.tipo === 'sinCirculo' && enFormacion.length > 0 ? enFormacion[enFormacion.length - 1] : null;
+    sinCirculo && llenandose.length > 0 ? llenandose[llenandose.length - 1] : null;
 
-  // Crear se puede abrir desde "Círculo" o "Grupo". Ver cómo va un círculo que se
-  // llena, también. Aportar, retirar y responder una solicitud, solo desde
-  // "Círculo" y con el círculo ya cargado.
+  // Crear y elegir círculo se pueden abrir desde "Círculo" o "Grupo". Ver cómo va
+  // un círculo que se llena, también. Aportar, retirar y responder una solicitud,
+  // solo desde "Círculo" y con un círculo en curso.
   const paso: Vista =
-    vista === 'crear' || (vista === 'formando' && viendoFormacion !== null)
+    vista === 'crear' ||
+    vista === 'circulos' ||
+    (vista === 'formando' && viendoFormacion !== null)
       ? vista
       : (vista === 'aportar' || vista === 'retirar' || vista === 'solicitud') &&
           pestana === 'circulo' &&
-          carga.tipo === 'listo'
+          actual !== null
         ? vista
         : 'inicio';
   const enPasoAparte = paso !== 'inicio';
@@ -190,38 +214,49 @@ export function PrincipalScreen({
     setEnFormacion((lista) => lista.map((c) => (c.id === actualizado.id ? actualizado : c)));
   }
 
-  // El círculo que se llenaba ya arrancó: pasa a ser "Mi círculo". Solo se llega
-  // aquí cuando la persona no tiene otro círculo en curso, porque la app todavía
-  // muestra uno solo.
+  // El círculo que se llenaba ya arrancó: se suma a los círculos en curso y pasa a
+  // ser el que se está viendo.
   function pasarAMiCirculo(arrancado: MiCirculo) {
-    setCarga({ tipo: 'listo', miCirculo: arrancado });
+    setActivos((lista) => conCirculoAgregado(lista, conEspera(arrancado)));
+    setActualId(arrancado.circulo.id);
     setEnFormacion((lista) => lista.filter((c) => c.id !== arrancado.circulo.id));
     setFormandoId(null);
     setPestana('circulo');
     setVista('inicio');
   }
 
+  // La persona eligió cuál de sus círculos ver.
+  function elegirCirculo(id: string) {
+    setActualId(id);
+    setPestana('circulo');
+    setVista('inicio');
+  }
+
   async function confirmarAporte(total: number) {
-    if (carga.tipo !== 'listo') {
+    if (actual === null) {
       return { ok: false, motivo: 'error' } as const;
     }
-    const { circulo, yoId } = carga.miCirculo;
+    const { circulo, yoId } = actual;
     const resultado = await aportes.aportar(circulo.id, total);
     if (resultado.ok) {
-      setCarga({ tipo: 'listo', miCirculo: { circulo: registrarAporte(circulo, yoId), yoId } });
+      setActivos((lista) =>
+        conCirculoActualizado(lista, { circulo: registrarAporte(circulo, yoId), yoId }),
+      );
       setVista('inicio');
     }
     return resultado;
   }
 
   async function confirmarRetiro(recibes: number) {
-    if (carga.tipo !== 'listo') {
+    if (actual === null) {
       return { ok: false, motivo: 'error' } as const;
     }
-    const { circulo, yoId } = carga.miCirculo;
+    const { circulo, yoId } = actual;
     const resultado = await retiros.retirar(circulo.id, recibes);
     if (resultado.ok) {
-      setCarga({ tipo: 'listo', miCirculo: { circulo: registrarRetiro(circulo, yoId), yoId } });
+      setActivos((lista) =>
+        conCirculoActualizado(lista, { circulo: registrarRetiro(circulo, yoId), yoId }),
+      );
       setVista('inicio');
     }
     return resultado;
@@ -234,7 +269,7 @@ export function PrincipalScreen({
       setFormandoId(resultado.enFormacion.id);
       // Con un círculo en curso se abre aparte, con "Volver"; sin él, el círculo
       // que se llena pasa a ser la pantalla principal.
-      setVista(carga.tipo === 'listo' ? 'formando' : 'inicio');
+      setVista(actual !== null ? 'formando' : 'inicio');
     }
     return resultado;
   }
@@ -253,11 +288,28 @@ export function PrincipalScreen({
     setVista('inicio');
   }
 
+  const abrirLista = () => setVista('circulos');
+
   return (
     <View style={estilos.pantalla}>
-      <View style={estilos.contenido}>
+      <ConMargenInferior activo={enPasoAparte} testID="margen-inferior">
         {paso === 'crear' && (
           <NuevoCirculoScreen onCrear={confirmarCreacion} onVolver={() => setVista('inicio')} />
+        )}
+
+        {paso === 'circulos' && (
+          <CirculosScreen
+            activos={activos}
+            actualId={actual?.circulo.id ?? null}
+            enFormacion={llenandose}
+            onElegir={elegirCirculo}
+            onVerFormacion={(id) => {
+              setFormandoId(id);
+              setVista('formando');
+            }}
+            onCrear={() => setVista('crear')}
+            onVolver={() => setVista('inicio')}
+          />
         )}
 
         {paso === 'formando' && viendoFormacion !== null && (
@@ -268,7 +320,6 @@ export function PrincipalScreen({
             onActualizado={actualizarFormacion}
             onCompartir={(mensaje) => compartir.compartir(mensaje)}
             obtenerArranque={() => circulos.obtenerArranque(viendoFormacion.id)}
-            puedeVerlo={carga.tipo !== 'listo'}
             onVerCirculo={pasarAMiCirculo}
             onVolver={() => setVista('inicio')}
           />
@@ -278,30 +329,30 @@ export function PrincipalScreen({
           <ConfirmarIdentidadScreen solicitud={solicitud} onResponder={responderSolicitud} />
         )}
 
-        {paso === 'aportar' && carga.tipo === 'listo' && (
+        {paso === 'aportar' && actual !== null && (
           <AportarScreen
-            miCirculo={carga.miCirculo}
+            miCirculo={actual}
             onConfirmar={confirmarAporte}
             onVolver={() => setVista('inicio')}
           />
         )}
 
-        {paso === 'retirar' && carga.tipo === 'listo' && (
+        {paso === 'retirar' && actual !== null && (
           <RetirarScreen
-            miCirculo={carga.miCirculo}
+            miCirculo={actual}
             onConfirmar={confirmarRetiro}
             onVolver={() => setVista('inicio')}
           />
         )}
 
-        {necesitaCirculo && !enPasoAparte && carga.tipo === 'cargando' && (
+        {necesitaCirculo && !enPasoAparte && carga === 'cargando' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <ActivityIndicator color={colors.cobalto} />
             <Text style={estilos.mensaje}>Cargando tu círculo…</Text>
           </SafeAreaView>
         )}
 
-        {necesitaCirculo && !enPasoAparte && carga.tipo === 'error' && (
+        {necesitaCirculo && !enPasoAparte && carga === 'error' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <Text style={estilos.mensaje} accessibilityRole="alert">
               {MENSAJE_ERROR}
@@ -312,7 +363,7 @@ export function PrincipalScreen({
           </SafeAreaView>
         )}
 
-        {necesitaCirculo && !enPasoAparte && carga.tipo === 'sinCirculo' && formacionPrincipal === null && (
+        {necesitaCirculo && !enPasoAparte && sinCirculo && formacionPrincipal === null && (
           <SinCirculoScreen onCrear={() => setVista('crear')} />
         )}
 
@@ -324,14 +375,14 @@ export function PrincipalScreen({
             onActualizado={actualizarFormacion}
             onCompartir={(mensaje) => compartir.compartir(mensaje)}
             obtenerArranque={() => circulos.obtenerArranque(formacionPrincipal.id)}
-            puedeVerlo
             onVerCirculo={pasarAMiCirculo}
+            onAbrirLista={hayVarios ? abrirLista : undefined}
           />
         )}
 
-        {pestana === 'circulo' && !enPasoAparte && carga.tipo === 'listo' && (
+        {pestana === 'circulo' && !enPasoAparte && actual !== null && (
           <InicioScreen
-            miCirculo={carga.miCirculo}
+            miCirculo={actual}
             onAportar={() => setVista('aportar')}
             onRetirar={() => setVista('retirar')}
             solicitud={solicitud}
@@ -340,20 +391,25 @@ export function PrincipalScreen({
             onAvisosMostrados={(ids) =>
               setAvisosMostrados((antes) => [...antes, ...ids.filter((id) => !antes.includes(id))])
             }
-            enFormacion={enFormacion}
+            enFormacion={llenandose}
             onVerFormacion={(id) => {
               setFormandoId(id);
               setVista('formando');
             }}
+            onAbrirLista={hayVarios ? abrirLista : undefined}
           />
         )}
 
-        {pestana === 'grupo' && !enPasoAparte && carga.tipo === 'listo' && (
-          <GrupoScreen miCirculo={carga.miCirculo} onCrearOtro={() => setVista('crear')} />
+        {pestana === 'grupo' && !enPasoAparte && actual !== null && (
+          <GrupoScreen
+            miCirculo={actual}
+            onCrearOtro={() => setVista('crear')}
+            onAbrirLista={hayVarios ? abrirLista : undefined}
+          />
         )}
 
         {pestana === 'perfil' && <PerfilScreen historiales={historiales} />}
-      </View>
+      </ConMargenInferior>
 
       {!enPasoAparte && <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />}
     </View>
@@ -364,9 +420,6 @@ const estilos = StyleSheet.create({
   pantalla: {
     flex: 1,
     backgroundColor: colors.fondo,
-  },
-  contenido: {
-    flex: 1,
   },
   centro: {
     flex: 1,

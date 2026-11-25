@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Marca } from '../components/Marca';
@@ -48,7 +54,11 @@ export function ConfirmarIdentidadScreen({ solicitud, onResponder }: Props) {
   return (
     <SafeAreaView style={estilos.pantalla}>
       <StatusBar style="light" />
-      <View style={estilos.contenido}>
+      <ScrollView
+        style={estilos.cuerpo}
+        contentContainerStyle={estilos.contenido}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={estilos.notificacion}>
           <View style={estilos.notificacionEncabezado}>
             <Marca tamano={22} />
@@ -89,7 +99,7 @@ export function ConfirmarIdentidadScreen({ solicitud, onResponder }: Props) {
             Si tienes dudas, di que no. Otra persona del círculo puede responder.
           </Text>
         </View>
-      </View>
+      </ScrollView>
 
       <View style={estilos.pie}>
         {error !== null && (
@@ -133,8 +143,11 @@ const estilos = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.noche,
   },
-  contenido: {
+  cuerpo: {
     flex: 1,
+  },
+  contenido: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
     gap: 16,

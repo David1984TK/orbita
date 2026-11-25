@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -128,7 +129,11 @@ export function CodigoScreen({
         style={estilos.teclado}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={estilos.contenido}>
+        <ScrollView
+          style={estilos.cuerpo}
+          contentContainerStyle={estilos.contenido}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={estilos.encabezado}>
             <Text style={estilos.titulo} accessibilityRole="header">
               Tu código
@@ -190,7 +195,7 @@ export function CodigoScreen({
               Cambiar número
             </Text>
           </Text>
-        </View>
+        </ScrollView>
 
         <View style={estilos.pie}>
           <Pressable
@@ -221,8 +226,11 @@ const estilos = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  contenido: {
+  cuerpo: {
     flex: 1,
+  },
+  contenido: {
+    flexGrow: 1,
     paddingTop: 24,
     gap: 28,
   },

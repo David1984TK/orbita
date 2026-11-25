@@ -35,7 +35,7 @@ type Opciones = {
   compartir?: (mensaje: string) => Promise<ResultadoDeCompartir>;
   conVolver?: boolean;
   arranque?: () => Promise<MiCirculo | null>;
-  puedeVerlo?: boolean;
+  conLista?: boolean;
 };
 
 async function abrir({
@@ -44,13 +44,14 @@ async function abrir({
   compartir,
   conVolver = false,
   arranque,
-  puedeVerlo = true,
+  conLista = false,
 }: Opciones = {}) {
   const consultar = jest.fn(obtener ?? (async () => circulo));
   const onActualizado = jest.fn();
   const onCompartir = jest.fn(compartir ?? (async (): Promise<ResultadoDeCompartir> => 'compartido'));
   const consultarArranque = jest.fn(arranque ?? (async (): Promise<MiCirculo | null> => null));
   const onVerCirculo = jest.fn();
+  const onAbrirLista = jest.fn();
   const onVolver = jest.fn();
   await render(
     <FormandoScreen
@@ -59,13 +60,21 @@ async function abrir({
       onActualizado={onActualizado}
       onCompartir={onCompartir}
       obtenerArranque={consultarArranque}
-      puedeVerlo={puedeVerlo}
       onVerCirculo={onVerCirculo}
+      onAbrirLista={conLista ? onAbrirLista : undefined}
       onVolver={conVolver ? onVolver : undefined}
       intervaloMs={INTERVALO}
     />,
   );
-  return { consultar, onActualizado, onCompartir, consultarArranque, onVerCirculo, onVolver };
+  return {
+    consultar,
+    onActualizado,
+    onCompartir,
+    consultarArranque,
+    onVerCirculo,
+    onAbrirLista,
+    onVolver,
+  };
 }
 
 // Un círculo de 5 personas ya lleno, y ese mismo círculo ya arrancado: quien lo creó
@@ -302,7 +311,6 @@ describe('FormandoScreen', () => {
           onActualizado={() => {}}
           onCompartir={async () => 'compartido'}
           obtenerArranque={async () => null}
-          puedeVerlo
           onVerCirculo={() => {}}
           intervaloMs={INTERVALO}
         />,
@@ -314,6 +322,23 @@ describe('FormandoScreen', () => {
       await pasar(INTERVALO * 4);
 
       expect(consultar.mock.calls.length).toBe(antes);
+    });
+  });
+
+  describe('cuando hay más de un círculo', () => {
+    it('el nombre es un botón que abre la lista de círculos', async () => {
+      const { onAbrirLista } = await abrir({ conLista: true });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Los del mercado. Cambiar de círculo.' }));
+
+      expect(onAbrirLista).toHaveBeenCalledTimes(1);
+    });
+
+    it('con un solo círculo el nombre es solo un título', async () => {
+      await abrir({ conLista: false });
+
+      expect(screen.getByText('Los del mercado')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: /Cambiar de círculo/ })).toBeNull();
     });
   });
 
@@ -410,26 +435,6 @@ describe('FormandoScreen', () => {
       expect(screen.queryByRole('button', { name: 'Compartir por WhatsApp' })).toBeNull();
     });
 
-    it('si la persona ya está en otro círculo, lo dice en vez de ofrecer verlo', async () => {
-      const { onVolver, onVerCirculo } = await abrir({
-        circulo: llenoDe5(),
-        arranque: async () => arrancado(),
-        puedeVerlo: false,
-        conVolver: true,
-      });
-      await screen.findByText('¡Tu círculo arrancó!');
-
-      expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
-      expect(
-        screen.getByText(/Ya estás en otro círculo\. Cuando puedas ver varios, este aparecerá/),
-      ).toBeTruthy();
-
-      await fireEvent.press(screen.getByRole('button', { name: 'Entendido' }));
-
-      expect(onVolver).toHaveBeenCalledTimes(1);
-      expect(onVerCirculo).not.toHaveBeenCalled();
-    });
-
     it('si no puede preguntar si arrancó avisa, sigue intentando y lo quita al conseguirlo', async () => {
       let falla = true;
       await abrir({
@@ -460,7 +465,6 @@ describe('FormandoScreen', () => {
           onActualizado={() => {}}
           onCompartir={async () => 'compartido'}
           obtenerArranque={preguntar}
-          puedeVerlo
           onVerCirculo={() => {}}
           intervaloMs={INTERVALO}
         />,
