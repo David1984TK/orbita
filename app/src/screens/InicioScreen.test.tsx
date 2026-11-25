@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { EstadoPago, MiCirculo } from '../domain';
 import { circuloDeEjemplo, formacionDeEjemplo } from '../servicios/circulos';
+import { solicitudDeEjemplo } from '../servicios/recuperacion';
 import { InicioScreen } from './InicioScreen';
 
 jest.mock('react-native-safe-area-context', () =>
@@ -247,7 +248,7 @@ describe('InicioScreen', () => {
       expect(screen.queryByText(/Estás formando/)).toBeNull();
     });
 
-    it('avisa de cada círculo que se llena y cuánto falta', async () => {
+    it('con varios avisos van en pila: se ve el de enfrente y se abre al tocarla', async () => {
       await abrirConFormacion([
         formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
         formacionDeEjemplo({
@@ -263,20 +264,60 @@ describe('InicioScreen', () => {
         }),
       ]);
 
+      // Cerrada, solo se ve el de enfrente.
+      expect(screen.getByText(/Primero/)).toBeTruthy();
+      expect(screen.queryByText(/Segundo/)).toBeNull();
+
+      await fireEvent.press(screen.getByRole('button', { name: '2 avisos. Toca para ver todos.' }));
+
       expect(screen.getByLabelText('Estás formando Primero. Faltan 9 personas.')).toBeTruthy();
       expect(screen.getByLabelText('Estás formando Segundo. Falta 1 persona.')).toBeTruthy();
     });
 
-    it('al tocar un aviso dice cuál círculo se quiere ver', async () => {
+    it('con un solo aviso es una tarjeta que se toca directo', async () => {
+      const { onVerFormacion } = await abrirConFormacion([formacionDeEjemplo({ id: 'uno' })]);
+
+      await fireEvent.press(screen.getByLabelText('Estás formando Los del mercado. Faltan 9 personas.'));
+
+      expect(onVerFormacion).toHaveBeenCalledWith('uno');
+    });
+
+    it('al abrir la pila y tocar un aviso dice cuál círculo se quiere ver', async () => {
       const { onVerFormacion } = await abrirConFormacion([
         formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
         formacionDeEjemplo({ id: 'dos', nombre: 'Segundo' }),
       ]);
+      await fireEvent.press(screen.getByRole('button', { name: '2 avisos. Toca para ver todos.' }));
 
       await fireEvent.press(screen.getByLabelText(/Estás formando Segundo/));
 
       expect(onVerFormacion).toHaveBeenCalledTimes(1);
       expect(onVerFormacion).toHaveBeenCalledWith('dos');
+    });
+
+    it('la solicitud de recuperación va al frente de la pila, antes de los círculos que se llenan', async () => {
+      await render(
+        <InicioScreen
+          miCirculo={miCirculo()}
+          onAportar={jest.fn()}
+          onRetirar={jest.fn()}
+          solicitud={solicitudDeEjemplo()}
+          onVerSolicitud={jest.fn()}
+          enFormacion={[formacionDeEjemplo()]}
+          onVerFormacion={jest.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/Julio Lara/)).toBeTruthy();
+      expect(screen.queryByText(/Estás formando/)).toBeNull();
+    });
+
+    it('los avisos flotan: no desplazan el título ni el resto del contenido', async () => {
+      await abrirConFormacion([formacionDeEjemplo({ id: 'uno' }), formacionDeEjemplo({ id: 'dos' })]);
+
+      // El título sigue en pantalla (la pila lo tapa visualmente, no lo mueve).
+      expect(screen.getByText('Los del mercado')).toBeTruthy();
+      expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
     });
   });
 });

@@ -12,6 +12,7 @@ export const colors = {
   cobalto: '#2F4BD8',
   cobaltoClaro: '#8399FF', // para fondos oscuros
   cobaltoSuave: 'rgba(47, 75, 216, 0.12)', // fondo tenue de un ícono o una etiqueta
+  avisoSolido: '#DBDEF3', // el mismo tono pero opaco, para las tarjetas que flotan sobre el contenido
   ambar: '#E08700',
   ambarClaro: '#FFC24D', // el ámbar cuando va sobre cobalto
   tinta: '#15171E', // texto principal; negro apenas azulado

@@ -1,5 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PilaDeAvisos } from '../components/PilaDeAvisos';
+import type { Aviso } from '../components/PilaDeAvisos';
 import { Rueda } from '../components/Rueda';
 import {
   boteDelCirculo,
@@ -85,151 +87,147 @@ export function InicioScreen({
     ? `La siguiente vence el ${formatearFechaConDia(fechaDeSemana(circulo, circulo.semanaActual + 1))}`
     : 'Fue la última cuota del círculo';
 
+  // Primero lo que no puede esperar (alguien que perdió su teléfono) y luego los
+  // círculos que se están llenando.
+  const avisos: Aviso[] = [
+    ...(solicitud === null
+      ? []
+      : [
+          {
+            id: 'solicitud',
+            etiqueta: `${solicitud.nombre} perdió su teléfono y pide volver a entrar. Toca para responder.`,
+            negrita: solicitud.nombre,
+            despues: ' perdió su teléfono y pide volver a entrar. Toca para responder.',
+            onPress: () => onVerSolicitud?.(),
+          },
+        ]),
+    ...enFormacion.map((formando) => ({
+      id: `formando-${formando.id}`,
+      etiqueta: `Estás formando ${formando.nombre}. ${textoDeFaltantesDelCirculo(formando)}.`,
+      antes: 'Estás formando ',
+      negrita: `«${formando.nombre}»`,
+      despues: ` · ${textoDeFaltantesDelCirculo(formando)}`,
+      onPress: () => onVerFormacion?.(formando.id),
+    })),
+  ];
+
   return (
     <SafeAreaView edges={['top']} style={estilos.pantalla}>
-      <ScrollView contentContainerStyle={estilos.contenido}>
-        {solicitud !== null && (
-          // Un aviso que no se puede perder: si la notificación se pasó, aquí sigue.
-          <Pressable
-            onPress={onVerSolicitud}
-            accessibilityRole="button"
-            accessibilityLabel={`${solicitud.nombre} perdió su teléfono y pide volver a entrar. Toca para responder.`}
-            style={({ pressed }) => [estilos.solicitud, pressed && estilos.botonPresionado]}
-          >
-            <Text style={estilos.solicitudTexto}>
-              <Text style={estilos.solicitudNegrita}>{solicitud.nombre}</Text> perdió su teléfono y
-              pide volver a entrar. Toca para responder.
+      <View style={estilos.raiz}>
+        <ScrollView contentContainerStyle={estilos.contenido}>
+          <View style={estilos.encabezado}>
+            <Text style={estilos.titulo} accessibilityRole="header">
+              {circulo.nombre}
             </Text>
-            <Text style={estilos.solicitudFlecha}>›</Text>
-          </Pressable>
-        )}
-
-        {enFormacion.map((formando) => (
-          // Un círculo que se está llenando: aquí se ve cuánto falta sin tener que
-          // buscarlo.
-          <Pressable
-            key={formando.id}
-            onPress={() => onVerFormacion?.(formando.id)}
-            accessibilityRole="button"
-            accessibilityLabel={`Estás formando ${formando.nombre}. ${textoDeFaltantesDelCirculo(formando)}.`}
-            style={({ pressed }) => [estilos.solicitud, pressed && estilos.botonPresionado]}
-          >
-            <Text style={estilos.solicitudTexto}>
-              Estás formando <Text style={estilos.solicitudNegrita}>«{formando.nombre}»</Text> ·{' '}
-              {textoDeFaltantesDelCirculo(formando)}
+            <Text style={estilos.subtitulo}>
+              {total} personas · {formatearMonto(circulo.cuotaSemanal, circulo.moneda)} cada semana
             </Text>
-            <Text style={estilos.solicitudFlecha}>›</Text>
-          </Pressable>
-        ))}
-
-        <View style={estilos.encabezado}>
-          <Text style={estilos.titulo} accessibilityRole="header">
-            {circulo.nombre}
-          </Text>
-          <Text style={estilos.subtitulo}>
-            {total} personas · {formatearMonto(circulo.cuotaSemanal, circulo.moneda)} cada semana
-          </Text>
-        </View>
-
-        <Rueda
-          segmentos={segmentosDeLaRueda(circulo, yoId)}
-          semanaActual={circulo.semanaActual}
-        />
-
-        <View style={estilos.tarjeta}>
-          <View style={estilos.fila}>
-            <View style={estilos.textos}>
-              <Text style={estilos.filaTitulo}>{miTurno.titulo}</Text>
-              <Text style={estilos.filaDetalle}>{miTurno.detalle}</Text>
-            </View>
-            <Text style={estilos.monto}>{formatearMonto(boteDelCirculo(circulo), circulo.moneda)}</Text>
           </View>
-          <View style={[estilos.fila, estilos.filaConLinea]}>
-            <View style={estilos.textos}>
-              <Text style={estilos.filaTitulo}>Llevas aportado</Text>
-              <Text style={estilos.filaDetalle}>
-                {aportes.cuotas} de {aportes.totalDeCuotas} cuotas,{' '}
-                {aportes.atrasada ? 'con un pago atrasado' : 'todas a tiempo'}
+
+          <Rueda
+            segmentos={segmentosDeLaRueda(circulo, yoId)}
+            semanaActual={circulo.semanaActual}
+          />
+
+          <View style={estilos.tarjeta}>
+            <View style={estilos.fila}>
+              <View style={estilos.textos}>
+                <Text style={estilos.filaTitulo}>{miTurno.titulo}</Text>
+                <Text style={estilos.filaDetalle}>{miTurno.detalle}</Text>
+              </View>
+              <Text style={estilos.monto}>{formatearMonto(boteDelCirculo(circulo), circulo.moneda)}</Text>
+            </View>
+            <View style={[estilos.fila, estilos.filaConLinea]}>
+              <View style={estilos.textos}>
+                <Text style={estilos.filaTitulo}>Llevas aportado</Text>
+                <Text style={estilos.filaDetalle}>
+                  {aportes.cuotas} de {aportes.totalDeCuotas} cuotas,{' '}
+                  {aportes.atrasada ? 'con un pago atrasado' : 'todas a tiempo'}
+                </Text>
+              </View>
+              <Text style={estilos.monto}>{formatearMonto(aportes.monto, circulo.moneda)}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={estilos.pie}>
+          {retirar || espera !== null ? (
+            // Es tu turno: retirar es lo principal. Si aún falta la cuota de esta
+            // semana, aportar queda a la mano como acción secundaria. Si estás en
+            // la espera de seguridad de después de recuperar el acceso, el botón
+            // se apaga y se dice hasta cuándo.
+            <>
+              {espera !== null ? (
+                <View
+                  style={[estilos.boton, estilos.botonInactivo]}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: true }}
+                  accessibilityLabel="Retirar mi dinero"
+                >
+                  <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={onRetirar}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+                >
+                  <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+                </Pressable>
+              )}
+              {!aportes.alDia && (
+                <Pressable
+                  onPress={onAportar}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [estilos.botonSecundario, pressed && estilos.botonPresionado]}
+                >
+                  <Text style={estilos.botonSecundarioTexto}>Aportar mi cuota</Text>
+                </Pressable>
+              )}
+              {espera !== null && (
+                <Text style={estilos.nota}>
+                  Por seguridad podrás retirar a partir del {formatearFechaConDia(fechaLocalDe(espera))}
+                </Text>
+              )}
+              <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
+                {aportes.alDia
+                  ? `Ya aportaste esta semana · ${siguiente}`
+                  : `${aportes.atrasada ? 'Venció' : 'Vence'} el ${formatearFechaConDia(aportes.vence)}`}
               </Text>
-            </View>
-            <Text style={estilos.monto}>{formatearMonto(aportes.monto, circulo.moneda)}</Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      <View style={estilos.pie}>
-        {retirar || espera !== null ? (
-          // Es tu turno: retirar es lo principal. Si aún falta la cuota de esta
-          // semana, aportar queda a la mano como acción secundaria. Si estás en
-          // la espera de seguridad de después de recuperar el acceso, el botón
-          // se apaga y se dice hasta cuándo.
-          <>
-            {espera !== null ? (
+            </>
+          ) : aportes.alDia ? (
+            <>
               <View
                 style={[estilos.boton, estilos.botonInactivo]}
                 accessible
                 accessibilityRole="button"
                 accessibilityState={{ disabled: true }}
-                accessibilityLabel="Retirar mi dinero"
+                accessibilityLabel="Ya aportaste esta semana"
               >
-                <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+                <Text style={estilos.botonTexto}>Ya aportaste esta semana</Text>
               </View>
-            ) : (
-              <Pressable
-                onPress={onRetirar}
-                accessibilityRole="button"
-                style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
-              >
-                <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
-              </Pressable>
-            )}
-            {!aportes.alDia && (
+              <Text style={estilos.nota}>{siguiente}</Text>
+            </>
+          ) : (
+            <>
               <Pressable
                 onPress={onAportar}
                 accessibilityRole="button"
-                style={({ pressed }) => [estilos.botonSecundario, pressed && estilos.botonPresionado]}
+                style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
               >
-                <Text style={estilos.botonSecundarioTexto}>Aportar mi cuota</Text>
+                <Text style={estilos.botonTexto}>Aportar mi cuota</Text>
               </Pressable>
-            )}
-            {espera !== null && (
-              <Text style={estilos.nota}>
-                Por seguridad podrás retirar a partir del {formatearFechaConDia(fechaLocalDe(espera))}
+              <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
+                {aportes.atrasada ? 'Venció' : 'Vence'} el {formatearFechaConDia(aportes.vence)}
               </Text>
-            )}
-            <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
-              {aportes.alDia
-                ? `Ya aportaste esta semana · ${siguiente}`
-                : `${aportes.atrasada ? 'Venció' : 'Vence'} el ${formatearFechaConDia(aportes.vence)}`}
-            </Text>
-          </>
-        ) : aportes.alDia ? (
-          <>
-            <View
-              style={[estilos.boton, estilos.botonInactivo]}
-              accessible
-              accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
-              accessibilityLabel="Ya aportaste esta semana"
-            >
-              <Text style={estilos.botonTexto}>Ya aportaste esta semana</Text>
-            </View>
-            <Text style={estilos.nota}>{siguiente}</Text>
-          </>
-        ) : (
-          <>
-            <Pressable
-              onPress={onAportar}
-              accessibilityRole="button"
-              style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
-            >
-              <Text style={estilos.botonTexto}>Aportar mi cuota</Text>
-            </Pressable>
-            <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
-              {aportes.atrasada ? 'Venció' : 'Vence'} el {formatearFechaConDia(aportes.vence)}
-            </Text>
-          </>
-        )}
+            </>
+          )}
+        </View>
+        {/* Los avisos flotan encima de toda la pantalla, en pila, sin empujar nada hacia
+            abajo: pueden tapar el nombre del círculo. Si la notificación se pasó, aquí
+            siguen. Van al final para quedar por encima de todo. */}
+        <PilaDeAvisos avisos={avisos} />
       </View>
     </SafeAreaView>
   );
@@ -240,33 +238,15 @@ const estilos = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.fondo,
   },
+  // Contenedor de toda la pantalla: la pila de avisos se posiciona contra él.
+  raiz: {
+    flex: 1,
+  },
   contenido: {
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 16,
     gap: 24,
-  },
-  solicitud: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 12,
-    backgroundColor: colors.cobaltoSuave,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  solicitudTexto: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.tinta,
-  },
-  solicitudNegrita: {
-    fontWeight: '700',
-  },
-  solicitudFlecha: {
-    fontSize: 24,
-    color: colors.cobalto,
   },
   encabezado: {
     gap: 6,
