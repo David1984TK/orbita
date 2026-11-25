@@ -33,11 +33,15 @@ function enMiTurno(): MiCirculo {
 }
 
 async function abrir(
-  obtener: () => Promise<MiCirculo> = async () => circuloDeEjemplo(),
+  obtener: () => Promise<MiCirculo | null> = async () => circuloDeEjemplo(),
   aportar: Aportes['aportar'] = async () => ({ ok: true }),
   retirar: Retiros['retirar'] = async () => ({ ok: true }),
+  crear: Circulos['crearCirculo'] = async () => ({ ok: true }),
 ) {
-  const circulos: Circulos = { obtenerMiCirculo: jest.fn(obtener) };
+  const circulos: Circulos = {
+    obtenerMiCirculo: jest.fn(obtener),
+    crearCirculo: jest.fn(crear),
+  };
   const aportes: Aportes = { aportar: jest.fn(aportar) };
   const retiros: Retiros = { retirar: jest.fn(retirar) };
   const historiales: Historiales = { obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) };
@@ -330,5 +334,129 @@ describe('PrincipalScreen', () => {
     expect(screen.getByText('Ahorrado con Órbita')).toBeTruthy();
     expect(pestana('Perfil').props.accessibilityState.selected).toBe(true);
     expect(historiales.obtenerMiHistorial).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Crear un círculo', () => {
+    const llenarYCrear = async () => {
+      await fireEvent.changeText(screen.getByLabelText('Nombre del círculo'), 'Los del mercado');
+      await fireEvent.changeText(screen.getByLabelText('Cuota semanal'), '600');
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear e invitar' }));
+    };
+
+    it('quien no está en ningún círculo ve una pantalla para crear el primero', async () => {
+      await abrir(async () => null);
+
+      expect(await screen.findByText('Aún no tienes un círculo')).toBeTruthy();
+      expect(screen.getByText(/de 5 a 15\s+integrantes/)).toBeTruthy();
+      expect(pestana('Círculo').props.accessibilityState.selected).toBe(true);
+    });
+
+    it('la pestaña Grupo también ofrece crear el primer círculo cuando no hay ninguno', async () => {
+      await abrir(async () => null);
+      await screen.findByText('Aún no tienes un círculo');
+
+      await fireEvent.press(pestana('Grupo'));
+
+      expect(screen.getByText('Aún no tienes un círculo')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Crear un círculo' })).toBeTruthy();
+    });
+
+    it('desde la pantalla vacía abre "Nuevo círculo", sin la barra de pestañas', async () => {
+      await abrir(async () => null);
+      await fireEvent.press(await screen.findByRole('button', { name: 'Crear un círculo' }));
+
+      expect(screen.getByText('Nuevo círculo')).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+    });
+
+    it('desde la pestaña Grupo, "Crear otro círculo" abre "Nuevo círculo"', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+      expect(screen.getByText('Nuevo círculo')).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Grupo' })).toBeNull();
+    });
+
+    it('"Volver" regresa a la pestaña de donde se vino, sin crear nada', async () => {
+      const { circulos } = await abrir();
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(screen.getByText('El grupo')).toBeTruthy();
+      expect(pestana('Grupo').props.accessibilityState.selected).toBe(true);
+      expect(circulos.crearCirculo).not.toHaveBeenCalled();
+    });
+
+    it('al crear manda lo elegido y pasa a la invitación, que todavía no existe', async () => {
+      const { circulos } = await abrir();
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+      await llenarYCrear();
+
+      expect(circulos.crearCirculo).toHaveBeenCalledWith({
+        nombre: 'Los del mercado',
+        integrantes: 10,
+        cuota: 600,
+        moneda: 'pesos',
+      });
+      expect(await screen.findByText(/Tu círculo «Los del mercado» se creó/)).toBeTruthy();
+      expect(screen.getByText(/Aquí va la invitación por WhatsApp/)).toBeTruthy();
+    });
+
+    it('desde la invitación se vuelve a la pestaña, con su barra', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await llenarYCrear();
+      await screen.findByText(/se creó/);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(screen.getByText('El grupo')).toBeTruthy();
+      expect(pestana('Grupo').props.accessibilityState.selected).toBe(true);
+    });
+
+    it('si la creación falla se queda en "Nuevo círculo" con lo escrito', async () => {
+      await abrir(undefined, undefined, undefined, async () => ({ ok: false, motivo: 'error' }));
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+      await llenarYCrear();
+
+      expect(await screen.findByText(/No pudimos crear tu círculo/)).toBeTruthy();
+      expect(screen.getByLabelText('Nombre del círculo').props.value).toBe('Los del mercado');
+      expect(screen.queryByText(/se creó/)).toBeNull();
+    });
+
+    it('el botón de atrás de Android cierra "Nuevo círculo"', async () => {
+      let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
+      const espia = jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_evento, manejador) => {
+          atras = manejador;
+          return { remove: jest.fn() };
+        });
+      await abrir(async () => null);
+      await fireEvent.press(await screen.findByRole('button', { name: 'Crear un círculo' }));
+      expect(screen.getByText('Nuevo círculo')).toBeTruthy();
+
+      await act(async () => {
+        expect(atras({} as never)).toBe(true);
+      });
+
+      expect(screen.queryByText('Nuevo círculo')).toBeNull();
+      expect(screen.getByText('Aún no tienes un círculo')).toBeTruthy();
+      espia.mockRestore();
+    });
   });
 });

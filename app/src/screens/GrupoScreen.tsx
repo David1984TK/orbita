@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   etiquetaDeEstado,
@@ -13,6 +13,8 @@ import { colors } from '../theme';
 
 type Props = {
   miCirculo: MiCirculo;
+  /** La persona quiere crear otro círculo, además de este. */
+  onCrearOtro: () => void;
 };
 
 type TonoDeAvatar = 'yo' | 'cobra' | 'normal';
@@ -75,7 +77,7 @@ function Fila({
  * ambigüedad: es la vigilancia mutua que el cuaderno de la tanda tiene
  * desordenada.
  */
-export function GrupoScreen({ miCirculo }: Props) {
+export function GrupoScreen({ miCirculo, onCrearOtro }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
   const cobra = quienCobra(circulo);
@@ -131,6 +133,14 @@ export function GrupoScreen({ miCirculo }: Props) {
             })}
           </View>
         </View>
+
+        <Pressable
+          onPress={onCrearOtro}
+          accessibilityRole="button"
+          style={({ pressed }) => [estilos.botonSecundario, pressed && estilos.botonPresionado]}
+        >
+          <Text style={estilos.botonSecundarioTexto}>Crear otro círculo</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -227,6 +237,22 @@ const estilos = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  botonSecundario: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.cobalto,
+  },
+  botonPresionado: {
+    opacity: 0.85,
+  },
+  botonSecundarioTexto: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.cobalto,
   },
   etiquetaTexto: {
     fontSize: 12,

@@ -5,14 +5,29 @@
 // desarrollo. Cuando haya de dónde leer el círculo se cambia la implementación
 // y las pantallas no se enteran.
 
-import type { Circulo, Integrante, MiCirculo } from '../domain';
+import type { BorradorDeCirculo, Circulo, Integrante, MiCirculo } from '../domain';
+
+export type MotivoDeFalloDeCreacion =
+  /** La persona cerró el Face ID o la huella sin confirmar. No es un error. */
+  | 'cancelada'
+  /** Cualquier otra cosa: sin conexión, fallo del sistema, etc. */
+  | 'error';
+
+export type ResultadoDeCreacion = { ok: true } | { ok: false; motivo: MotivoDeFalloDeCreacion };
 
 export type Circulos = {
   /**
-   * El círculo de la persona. Lanza un error si no se pudo consultar (sin
-   * internet, servidor caído).
+   * El círculo de la persona, o `null` si todavía no está en ninguno. Lanza un
+   * error si no se pudo consultar (sin internet, servidor caído).
    */
-  obtenerMiCirculo(): Promise<MiCirculo>;
+  obtenerMiCirculo(): Promise<MiCirculo | null>;
+  /**
+   * Crea un círculo con lo que la persona eligió, pidiendo la confirmación
+   * biométrica (crear un círculo es firmar con su llave). Devuelve el resultado
+   * para lo esperado (cancelar, fallar); lanza solo ante lo inesperado. Invitar
+   * a las demás integrantes es un paso aparte, que todavía no existe.
+   */
+  crearCirculo(borrador: BorradorDeCirculo): Promise<ResultadoDeCreacion>;
 };
 
 const NOMBRES = [
@@ -71,14 +86,20 @@ const simulados: Circulos = {
   async obtenerMiCirculo() {
     return circuloDeEjemplo();
   },
+  async crearCirculo() {
+    return { ok: true };
+  },
 };
 
-// Fuera de desarrollo no hay de dónde leer el círculo, así que falla. Es a
-// propósito: una versión instalable no debe enseñar un círculo inventado como
-// si fuera el dinero de la persona.
+// Fuera de desarrollo no hay de dónde leer el círculo ni con qué crearlo, así
+// que falla. Es a propósito: una versión instalable no debe enseñar un círculo
+// inventado como si fuera el dinero de la persona, ni decir que creó uno.
 const sinContratos: Circulos = {
   async obtenerMiCirculo() {
     throw new Error('Todavía no hay de dónde leer los círculos.');
+  },
+  async crearCirculo() {
+    throw new Error('Todavía no hay contratos con los que crear círculos.');
   },
 };
 

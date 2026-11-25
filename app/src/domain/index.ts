@@ -12,6 +12,7 @@ export {
   LARGO_CODIGO,
 } from './codigo';
 export {
+  fechaDeHoy,
   formatearFecha,
   formatearFechaConDia,
   formatearMonto,
@@ -50,6 +51,19 @@ export {
   segmentosDeLaRueda,
 } from './rueda';
 export type { EstadoSegmento, ResumenDeAportes, ResumenDeMiTurno } from './rueda';
+export {
+  MAX_INTEGRANTES,
+  MAX_NOMBRE,
+  MIN_INTEGRANTES,
+  MONEDAS_DISPONIBLES,
+  ajustarIntegrantes,
+  cuotaDeTexto,
+  esBorradorValido,
+  normalizarCuota,
+  resumenDelBorrador,
+  validarBorrador,
+} from './nuevoCirculo';
+export type { BorradorDeCirculo, ErroresDelBorrador, ResumenDelBorrador } from './nuevoCirculo';
 export { fraccionDelPuntaje } from './historial';
 export type { Historial, Nivel } from './historial';
 export type { Circulo, Integrante, EstadoPago, Moneda, MiCirculo } from './circulo';

@@ -1,4 +1,10 @@
-import { formatearFecha, formatearFechaConDia, formatearMonto, sumarDias } from './formato';
+import {
+  fechaDeHoy,
+  formatearFecha,
+  formatearFechaConDia,
+  formatearMonto,
+  sumarDias,
+} from './formato';
 
 describe('sumarDias', () => {
   it('suma una semana dentro del mismo mes y entre meses', () => {
@@ -67,5 +73,25 @@ describe('formatearMonto', () => {
 
   it('un monto negativo lleva el signo antes del símbolo', () => {
     expect(formatearMonto(-1800, 'pesos')).toBe('−$1,800');
+  });
+});
+
+describe('fechaDeHoy', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('da la fecha local en formato AAAA-MM-DD, con ceros', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 0, 5, 10, 30));
+
+    expect(fechaDeHoy()).toBe('2026-01-05');
+  });
+
+  it('a las 11 de la noche sigue siendo el mismo día local, no el siguiente en UTC', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 10, 24, 23, 30));
+
+    expect(fechaDeHoy()).toBe('2026-11-24');
   });
 });

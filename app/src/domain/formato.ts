@@ -80,3 +80,11 @@ export function formatearMonto(
   const simbolo = moneda === 'dolares' ? 'US$' : '$';
   return `${signo}${simbolo}${conComas}${centavos !== undefined ? `.${centavos}` : ''}`;
 }
+
+/** La fecha de hoy en el teléfono, como "AAAA-MM-DD" (con la hora local, no la UTC). */
+export function fechaDeHoy(): string {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoy.getDate()).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}

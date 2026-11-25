@@ -3,8 +3,9 @@ import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
+import { PantallaProvisional } from '../components/PantallaProvisional';
 import { registrarAporte, registrarRetiro } from '../domain';
-import type { MiCirculo } from '../domain';
+import type { BorradorDeCirculo, MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
 import type { Historiales } from '../servicios/historial';
@@ -13,8 +14,10 @@ import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
 import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
+import { NuevoCirculoScreen } from './NuevoCirculoScreen';
 import { PerfilScreen } from './PerfilScreen';
 import { RetirarScreen } from './RetirarScreen';
+import { SinCirculoScreen } from './SinCirculoScreen';
 
 type Props = {
   circulos: Circulos;
@@ -23,12 +26,18 @@ type Props = {
   historiales: Historiales;
 };
 
-/** Dentro de "Círculo": la pantalla de siempre o uno de los pasos cortos. */
-type Vista = 'inicio' | 'aportar' | 'retirar';
+/**
+ * La pantalla de la pestaña o uno de los pasos cortos que se abren encima:
+ * aportar y retirar (desde "Círculo") y crear un círculo (desde la pantalla
+ * vacía o desde "Grupo"). "invitar" es el paso que sigue a crear: todavía no
+ * existe.
+ */
+type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'invitar';
 
 type Carga =
   | { tipo: 'cargando' }
   | { tipo: 'listo'; miCirculo: MiCirculo }
+  | { tipo: 'sinCirculo' }
   | { tipo: 'error' };
 
 const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e inténtalo de nuevo.';
@@ -38,13 +47,15 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
  *
  * Existen "Círculo" (con "Aportar" y "Tu turno" dentro), "Grupo" y "Perfil" (mi
  * historial). "Círculo" y "Grupo" leen el mismo círculo, así que comparten la
- * carga y sus avisos; "Perfil" pide su propio historial. Mientras se aporta o se retira no se ve la
- * barra de pestañas: son pasos cortos que se confirman o se cancelan.
+ * carga y sus avisos; "Perfil" pide su propio historial. Mientras se aporta, se
+ * retira o se crea un círculo no se ve la barra de pestañas: son pasos cortos
+ * que se confirman o se cancelan.
  */
 export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [vista, setVista] = useState<Vista>('inicio');
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
+  const [creado, setCreado] = useState('');
 
   const cargar = useCallback(() => {
     let cancelado = false;
@@ -53,7 +64,7 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
       .obtenerMiCirculo()
       .then((miCirculo) => {
         if (!cancelado) {
-          setCarga({ tipo: 'listo', miCirculo });
+          setCarga(miCirculo === null ? { tipo: 'sinCirculo' } : { tipo: 'listo', miCirculo });
         }
       })
       .catch(() => {
@@ -68,8 +79,7 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
 
   useEffect(() => cargar(), [cargar]);
 
-  // En Android el botón de atrás cierra "Aportar" o "Tu turno" en vez de salirse
-  // de la app.
+  // En Android el botón de atrás cierra el paso corto en vez de salirse de la app.
   useEffect(() => {
     if (vista === 'inicio') {
       return undefined;
@@ -84,8 +94,17 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
   // "Círculo" y "Grupo" se alimentan del mismo círculo.
   const necesitaCirculo = pestana === 'circulo' || pestana === 'grupo';
 
-  // Solo se llega a "Aportar" y a "Tu turno" con el círculo ya cargado.
-  const enPasoAparte = pestana === 'circulo' && vista !== 'inicio' && carga.tipo === 'listo';
+  // Crear e invitar se pueden abrir desde "Círculo" o "Grupo". Aportar y retirar
+  // solo desde "Círculo" y con el círculo ya cargado.
+  const paso: Vista =
+    vista === 'crear' || vista === 'invitar'
+      ? vista
+      : (vista === 'aportar' || vista === 'retirar') &&
+          pestana === 'circulo' &&
+          carga.tipo === 'listo'
+        ? vista
+        : 'inicio';
+  const enPasoAparte = paso !== 'inicio';
 
   async function confirmarAporte(total: number) {
     if (carga.tipo !== 'listo') {
@@ -113,6 +132,15 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
     return resultado;
   }
 
+  async function confirmarCreacion(borrador: BorradorDeCirculo) {
+    const resultado = await circulos.crearCirculo(borrador);
+    if (resultado.ok) {
+      setCreado(borrador.nombre);
+      setVista('invitar');
+    }
+    return resultado;
+  }
+
   function cambiarPestana(nueva: Pestana) {
     setPestana(nueva);
     setVista('inicio');
@@ -121,7 +149,21 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
   return (
     <View style={estilos.pantalla}>
       <View style={estilos.contenido}>
-        {enPasoAparte && vista === 'aportar' && carga.tipo === 'listo' && (
+        {paso === 'crear' && (
+          <NuevoCirculoScreen onCrear={confirmarCreacion} onVolver={() => setVista('inicio')} />
+        )}
+
+        {paso === 'invitar' && (
+          // Provisional: invitar por WhatsApp necesita el servidor (Etapa 3), y un
+          // círculo recién creado todavía no tiene dónde mostrarse (falta el
+          // estado "formando el círculo").
+          <PantallaProvisional
+            texto={`Tu círculo «${creado}» se creó (simulado). Aquí va la invitación por WhatsApp. Todavía no existe.`}
+            onVolver={() => setVista('inicio')}
+          />
+        )}
+
+        {paso === 'aportar' && carga.tipo === 'listo' && (
           <AportarScreen
             miCirculo={carga.miCirculo}
             onConfirmar={confirmarAporte}
@@ -129,7 +171,7 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
           />
         )}
 
-        {enPasoAparte && vista === 'retirar' && carga.tipo === 'listo' && (
+        {paso === 'retirar' && carga.tipo === 'listo' && (
           <RetirarScreen
             miCirculo={carga.miCirculo}
             onConfirmar={confirmarRetiro}
@@ -155,6 +197,10 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
           </SafeAreaView>
         )}
 
+        {necesitaCirculo && !enPasoAparte && carga.tipo === 'sinCirculo' && (
+          <SinCirculoScreen onCrear={() => setVista('crear')} />
+        )}
+
         {pestana === 'circulo' && !enPasoAparte && carga.tipo === 'listo' && (
           <InicioScreen
             miCirculo={carga.miCirculo}
@@ -163,7 +209,9 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
           />
         )}
 
-        {pestana === 'grupo' && carga.tipo === 'listo' && <GrupoScreen miCirculo={carga.miCirculo} />}
+        {pestana === 'grupo' && !enPasoAparte && carga.tipo === 'listo' && (
+          <GrupoScreen miCirculo={carga.miCirculo} onCrearOtro={() => setVista('crear')} />
+        )}
 
         {pestana === 'perfil' && <PerfilScreen historiales={historiales} />}
       </View>

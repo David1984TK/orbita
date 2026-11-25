@@ -22,8 +22,27 @@ describe('círculo de ejemplo (solo desarrollo)', () => {
   });
 });
 
+describe('crear un círculo', () => {
+  const borrador = { nombre: 'Los del mercado', integrantes: 15, cuota: 600, moneda: 'pesos' } as const;
+
+  it('en desarrollo da la creación por buena', async () => {
+    await expect(crearCirculos(true).crearCirculo(borrador)).resolves.toEqual({ ok: true });
+  });
+});
+
 describe('círculos fuera de desarrollo', () => {
   it('nunca enseña un círculo inventado: falla por no haber de dónde leerlo', async () => {
     await expect(crearCirculos(false).obtenerMiCirculo()).rejects.toThrow();
+  });
+
+  it('nunca dice que creó un círculo: falla por no haber contratos', async () => {
+    await expect(
+      crearCirculos(false).crearCirculo({
+        nombre: 'Los del mercado',
+        integrantes: 15,
+        cuota: 600,
+        moneda: 'pesos',
+      }),
+    ).rejects.toThrow();
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { EstadoPago, MiCirculo } from '../domain';
 import { circuloDeEjemplo } from '../servicios/circulos';
 import { GrupoScreen } from './GrupoScreen';
@@ -11,7 +11,9 @@ jest.mock('react-native-safe-area-context', () =>
 // Carmen Ruiz va 3 días tarde, yo (David Nava, turno 12) tengo pendiente la
 // cuota de esta semana y las demás van al día.
 async function abrir(miCirculo: MiCirculo = circuloDeEjemplo()) {
-  await render(<GrupoScreen miCirculo={miCirculo} />);
+  const onCrearOtro = jest.fn();
+  await render(<GrupoScreen miCirculo={miCirculo} onCrearOtro={onCrearOtro} />);
+  return { onCrearOtro };
 }
 
 function conEstados(cambios: Record<string, { estado: EstadoPago; diasDeAtraso?: number }>): MiCirculo {
@@ -128,5 +130,13 @@ describe('GrupoScreen', () => {
 
     expect(screen.queryByText('COBRA ESTA SEMANA')).toBeNull();
     expect(screen.getByText('LOS 15 INTEGRANTES')).toBeTruthy();
+  });
+
+  it('al final ofrece "Crear otro círculo" y avisa al tocarlo', async () => {
+    const { onCrearOtro } = await abrir();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+    expect(onCrearOtro).toHaveBeenCalledTimes(1);
   });
 });
