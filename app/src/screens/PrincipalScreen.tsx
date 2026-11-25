@@ -4,19 +4,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
 import { PantallaProvisional } from '../components/PantallaProvisional';
-import { registrarAporte } from '../domain';
+import { registrarAporte, registrarRetiro } from '../domain';
 import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
+import type { Retiros } from '../servicios/retiros';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
 import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
+import { RetirarScreen } from './RetirarScreen';
 
 type Props = {
   circulos: Circulos;
   aportes: Aportes;
+  retiros: Retiros;
 };
+
+/** Dentro de "Círculo": la pantalla de siempre o uno de los pasos cortos. */
+type Vista = 'inicio' | 'aportar' | 'retirar';
 
 type Carga =
   | { tipo: 'cargando' }
@@ -28,14 +34,14 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
 /**
  * La app una vez dentro: la barra de pestañas y la pantalla de cada una.
  *
- * Existen "Círculo" (con "Aportar" dentro) y "Grupo". "Perfil" es un marcador
- * de lugar. "Círculo" y "Grupo" leen el mismo círculo, así que comparten la
- * carga y sus avisos. Mientras se aporta no se ve la barra de pestañas: es un
- * paso corto que se confirma o se cancela.
+ * Existen "Círculo" (con "Aportar" y "Tu turno" dentro) y "Grupo". "Perfil" es
+ * un marcador de lugar. "Círculo" y "Grupo" leen el mismo círculo, así que
+ * comparten la carga y sus avisos. Mientras se aporta o se retira no se ve la
+ * barra de pestañas: son pasos cortos que se confirman o se cancelan.
  */
-export function PrincipalScreen({ circulos, aportes }: Props) {
+export function PrincipalScreen({ circulos, aportes, retiros }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
-  const [aportando, setAportando] = useState(false);
+  const [vista, setVista] = useState<Vista>('inicio');
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
 
   const cargar = useCallback(() => {
@@ -60,23 +66,24 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
 
   useEffect(() => cargar(), [cargar]);
 
-  // En Android el botón de atrás cierra "Aportar" en vez de salirse de la app.
+  // En Android el botón de atrás cierra "Aportar" o "Tu turno" en vez de salirse
+  // de la app.
   useEffect(() => {
-    if (!aportando) {
+    if (vista === 'inicio') {
       return undefined;
     }
     const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => {
-      setAportando(false);
+      setVista('inicio');
       return true;
     });
     return () => suscripcion.remove();
-  }, [aportando]);
+  }, [vista]);
 
   // "Círculo" y "Grupo" se alimentan del mismo círculo.
   const necesitaCirculo = pestana === 'circulo' || pestana === 'grupo';
 
-  // Solo se llega a "Aportar" con el círculo ya cargado.
-  const aportandoAhora = pestana === 'circulo' && aportando && carga.tipo === 'listo';
+  // Solo se llega a "Aportar" y a "Tu turno" con el círculo ya cargado.
+  const enPasoAparte = pestana === 'circulo' && vista !== 'inicio' && carga.tipo === 'listo';
 
   async function confirmarAporte(total: number) {
     if (carga.tipo !== 'listo') {
@@ -86,35 +93,56 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
     const resultado = await aportes.aportar(circulo.id, total);
     if (resultado.ok) {
       setCarga({ tipo: 'listo', miCirculo: { circulo: registrarAporte(circulo, yoId), yoId } });
-      setAportando(false);
+      setVista('inicio');
+    }
+    return resultado;
+  }
+
+  async function confirmarRetiro(recibes: number) {
+    if (carga.tipo !== 'listo') {
+      return { ok: false, motivo: 'error' } as const;
+    }
+    const { circulo, yoId } = carga.miCirculo;
+    const resultado = await retiros.retirar(circulo.id, recibes);
+    if (resultado.ok) {
+      setCarga({ tipo: 'listo', miCirculo: { circulo: registrarRetiro(circulo, yoId), yoId } });
+      setVista('inicio');
     }
     return resultado;
   }
 
   function cambiarPestana(nueva: Pestana) {
     setPestana(nueva);
-    setAportando(false);
+    setVista('inicio');
   }
 
   return (
     <View style={estilos.pantalla}>
       <View style={estilos.contenido}>
-        {aportandoAhora && carga.tipo === 'listo' && (
+        {enPasoAparte && vista === 'aportar' && carga.tipo === 'listo' && (
           <AportarScreen
             miCirculo={carga.miCirculo}
             onConfirmar={confirmarAporte}
-            onVolver={() => setAportando(false)}
+            onVolver={() => setVista('inicio')}
           />
         )}
 
-        {necesitaCirculo && !aportandoAhora && carga.tipo === 'cargando' && (
+        {enPasoAparte && vista === 'retirar' && carga.tipo === 'listo' && (
+          <RetirarScreen
+            miCirculo={carga.miCirculo}
+            onConfirmar={confirmarRetiro}
+            onVolver={() => setVista('inicio')}
+          />
+        )}
+
+        {necesitaCirculo && !enPasoAparte && carga.tipo === 'cargando' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <ActivityIndicator color={colors.cobalto} />
             <Text style={estilos.mensaje}>Cargando tu círculo…</Text>
           </SafeAreaView>
         )}
 
-        {necesitaCirculo && !aportandoAhora && carga.tipo === 'error' && (
+        {necesitaCirculo && !enPasoAparte && carga.tipo === 'error' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <Text style={estilos.mensaje} accessibilityRole="alert">
               {MENSAJE_ERROR}
@@ -125,8 +153,12 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
           </SafeAreaView>
         )}
 
-        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'listo' && (
-          <InicioScreen miCirculo={carga.miCirculo} onAportar={() => setAportando(true)} />
+        {pestana === 'circulo' && !enPasoAparte && carga.tipo === 'listo' && (
+          <InicioScreen
+            miCirculo={carga.miCirculo}
+            onAportar={() => setVista('aportar')}
+            onRetirar={() => setVista('retirar')}
+          />
         )}
 
         {pestana === 'grupo' && carga.tipo === 'listo' && <GrupoScreen miCirculo={carga.miCirculo} />}
@@ -136,7 +168,7 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
         )}
       </View>
 
-      {!aportandoAhora && <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />}
+      {!enPasoAparte && <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />}
     </View>
   );
 }

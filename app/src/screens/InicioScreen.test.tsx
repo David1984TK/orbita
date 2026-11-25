@@ -43,8 +43,11 @@ function miCirculo({ semanaActual, miTurno, miEstado, misCuotas }: Cambios = {})
 
 async function abrir(cambios: Cambios = {}) {
   const onAportar = jest.fn();
-  await render(<InicioScreen miCirculo={miCirculo(cambios)} onAportar={onAportar} />);
-  return { onAportar };
+  const onRetirar = jest.fn();
+  await render(
+    <InicioScreen miCirculo={miCirculo(cambios)} onAportar={onAportar} onRetirar={onRetirar} />,
+  );
+  return { onAportar, onRetirar };
 }
 
 describe('InicioScreen', () => {
@@ -135,5 +138,41 @@ describe('InicioScreen', () => {
     await abrir({ semanaActual: 15, miTurno: 3, miEstado: 'alDia', misCuotas: 15 });
 
     expect(screen.getByText('Fue la última cuota del círculo')).toBeTruthy();
+  });
+
+  describe('cuando es mi turno de cobrar', () => {
+    it('ofrece retirar como lo principal y no antes de mi turno', async () => {
+      const antes = await abrir({ miTurno: 9 });
+      expect(screen.queryByRole('button', { name: 'Retirar mi dinero' })).toBeNull();
+      expect(antes.onRetirar).not.toHaveBeenCalled();
+    });
+
+    it('en mi semana aparece "Retirar mi dinero" y avisa al tocarlo', async () => {
+      const { onRetirar } = await abrir({ miTurno: 6 });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(onRetirar).toHaveBeenCalledTimes(1);
+    });
+
+    it('si me falta la cuota de esta semana, aportar queda como acción secundaria', async () => {
+      const { onAportar, onRetirar } = await abrir({ miTurno: 6, miEstado: 'pendiente' });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aportar mi cuota' }));
+
+      expect(onAportar).toHaveBeenCalledTimes(1);
+      expect(onRetirar).not.toHaveBeenCalled();
+      expect(screen.getByText('Vence el lunes 30 de noviembre')).toBeTruthy();
+    });
+
+    it('si ya aporté esta semana solo queda retirar y se dice que ya aporté', async () => {
+      await abrir({ miTurno: 6, miEstado: 'alDia', misCuotas: 6 });
+
+      expect(screen.getByRole('button', { name: 'Retirar mi dinero' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Aportar mi cuota' })).toBeNull();
+      expect(
+        screen.getByText('Ya aportaste esta semana · La siguiente vence el lunes 7 de diciembre'),
+      ).toBeTruthy();
+    });
   });
 });

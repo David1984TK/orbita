@@ -31,6 +31,8 @@ export type Integrante = {
    * `atrasado`; si falta, se muestra un "Atrasado" sin número.
    */
   diasDeAtraso?: number;
+  /** `true` si ya retiró el bote de su turno. Si falta, se entiende que no. */
+  yaRetiro?: boolean;
 };
 
 export type Circulo = {

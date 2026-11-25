@@ -4,20 +4,42 @@ import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import { circuloDeEjemplo } from '../servicios/circulos';
 import type { Circulos } from '../servicios/circulos';
+import type { Retiros } from '../servicios/retiros';
 import { PrincipalScreen } from './PrincipalScreen';
 
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
 );
 
+// El círculo de ejemplo con mi turno puesto en la semana en curso (la 6): ahí se
+// puede retirar el bote.
+function enMiTurno(): MiCirculo {
+  const base = circuloDeEjemplo();
+  const yoAntes = base.circulo.integrantes.find((i) => i.id === base.yoId)!;
+  return {
+    yoId: base.yoId,
+    circulo: {
+      ...base.circulo,
+      integrantes: base.circulo.integrantes.map((i) => {
+        if (i.id === base.yoId) {
+          return { ...i, turno: base.circulo.semanaActual };
+        }
+        return i.turno === base.circulo.semanaActual ? { ...i, turno: yoAntes.turno } : i;
+      }),
+    },
+  };
+}
+
 async function abrir(
   obtener: () => Promise<MiCirculo> = async () => circuloDeEjemplo(),
   aportar: Aportes['aportar'] = async () => ({ ok: true }),
+  retirar: Retiros['retirar'] = async () => ({ ok: true }),
 ) {
   const circulos: Circulos = { obtenerMiCirculo: jest.fn(obtener) };
   const aportes: Aportes = { aportar: jest.fn(aportar) };
-  await render(<PrincipalScreen circulos={circulos} aportes={aportes} />);
-  return { circulos, aportes };
+  const retiros: Retiros = { retirar: jest.fn(retirar) };
+  await render(<PrincipalScreen circulos={circulos} aportes={aportes} retiros={retiros} />);
+  return { circulos, aportes, retiros };
 }
 
 const botonConfirmar = () => screen.getByRole('button', { name: /Confirmar con/ });
@@ -191,5 +213,100 @@ describe('PrincipalScreen', () => {
 
     expect(screen.getByText(/No pudimos cargar tu círculo/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
+  });
+
+  describe('Tu turno (retirar)', () => {
+    const botonRetirar = () => screen.getByRole('button', { name: 'Retirar mi dinero' });
+
+    it('antes de mi turno no se ofrece retirar', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+
+      expect(screen.queryByRole('button', { name: 'Retirar mi dinero' })).toBeNull();
+    });
+
+    it('en mi turno abre la pantalla de retiro, sin la barra de pestañas', async () => {
+      await abrir(async () => enMiTurno());
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(screen.getByText('Es tu turno, semana 6')).toBeTruthy();
+      expect(screen.getByText('$8,865')).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+    });
+
+    it('"Volver" regresa a Mi círculo sin retirar', async () => {
+      const { retiros } = await abrir(async () => enMiTurno());
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(screen.getByText('Los del mercado')).toBeTruthy();
+      expect(botonRetirar()).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+      expect(retiros.retirar).not.toHaveBeenCalled();
+    });
+
+    it('al retirar manda lo que recibes y Mi círculo ya dice que cobraste', async () => {
+      const { retiros } = await abrir(async () => enMiTurno());
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(retiros.retirar).toHaveBeenCalledWith('los-del-mercado', 8865);
+      expect(await screen.findByText('Ya cobraste en la semana 6')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Retirar mi dinero' })).toBeNull();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+    });
+
+    it('si el retiro falla se queda en la pantalla de retiro y no cambia nada', async () => {
+      await abrir(
+        async () => enMiTurno(),
+        undefined,
+        async () => ({ ok: false, motivo: 'error' }),
+      );
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(await screen.findByText(/No pudimos completar tu retiro/)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+      expect(screen.getByText('Te toca esta semana')).toBeTruthy();
+      expect(botonRetirar()).toBeTruthy();
+    });
+
+    it('si la persona cancela la confirmación sigue en la pantalla de retiro', async () => {
+      await abrir(
+        async () => enMiTurno(),
+        undefined,
+        async () => ({ ok: false, motivo: 'cancelada' }),
+      );
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(screen.getByText('Es tu turno, semana 6')).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('el botón de atrás de Android cierra la pantalla de retiro', async () => {
+      let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
+      const espia = jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_evento, manejador) => {
+          atras = manejador;
+          return { remove: jest.fn() };
+        });
+      await abrir(async () => enMiTurno());
+      await fireEvent.press(await screen.findByRole('button', { name: 'Retirar mi dinero' }));
+      expect(screen.getByText('Es tu turno, semana 6')).toBeTruthy();
+
+      await act(async () => {
+        expect(atras({} as never)).toBe(true);
+      });
+
+      expect(screen.queryByText('Es tu turno, semana 6')).toBeNull();
+      expect(screen.getByText('Los del mercado')).toBeTruthy();
+      espia.mockRestore();
+    });
   });
 });

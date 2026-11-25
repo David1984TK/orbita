@@ -25,6 +25,15 @@ export {
 } from './aporte';
 export type { DesgloseDeAporte } from './aporte';
 export {
+  COMISION_DE_RETIRO,
+  COMISION_ORBITA,
+  PORCENTAJE_COMISION_ORBITA,
+  desgloseDeRetiro,
+  puedeRetirar,
+  registrarRetiro,
+} from './retiro';
+export type { DesgloseDeRetiro } from './retiro';
+export {
   etiquetaDeEstado,
   iniciales,
   integrantesOrdenados,

@@ -7,6 +7,7 @@ import {
   formatearFecha,
   formatearFechaConDia,
   formatearMonto,
+  puedeRetirar,
   resumenDeAportes,
   resumenDeMiTurno,
   segmentosDeLaRueda,
@@ -18,6 +19,8 @@ type Props = {
   miCirculo: MiCirculo;
   /** La persona quiere aportar su cuota de esta semana. */
   onAportar: () => void;
+  /** La persona quiere retirar el bote de su turno. */
+  onRetirar: () => void;
 };
 
 function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
@@ -47,12 +50,16 @@ function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
  * Pantalla principal: "Mi círculo". Es la que se abre cien veces al día, así
  * que contesta de un vistazo en qué semana vamos y cuándo me toca.
  */
-export function InicioScreen({ miCirculo, onAportar }: Props) {
+export function InicioScreen({ miCirculo, onAportar, onRetirar }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
   const miTurno = textoDeMiTurno(resumenDeMiTurno(circulo, yoId), total);
   const aportes = resumenDeAportes(circulo, yoId);
   const hayOtraSemana = circulo.semanaActual < total;
+  const retirar = puedeRetirar(circulo, yoId);
+  const siguiente = hayOtraSemana
+    ? `La siguiente vence el ${formatearFechaConDia(fechaDeSemana(circulo, circulo.semanaActual + 1))}`
+    : 'Fue la última cuota del círculo';
 
   return (
     <SafeAreaView edges={['top']} style={estilos.pantalla}>
@@ -93,7 +100,33 @@ export function InicioScreen({ miCirculo, onAportar }: Props) {
       </ScrollView>
 
       <View style={estilos.pie}>
-        {aportes.alDia ? (
+        {retirar ? (
+          // Es tu turno: retirar es lo principal. Si aún falta la cuota de esta
+          // semana, aportar queda a la mano como acción secundaria.
+          <>
+            <Pressable
+              onPress={onRetirar}
+              accessibilityRole="button"
+              style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+            >
+              <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+            </Pressable>
+            {!aportes.alDia && (
+              <Pressable
+                onPress={onAportar}
+                accessibilityRole="button"
+                style={({ pressed }) => [estilos.botonSecundario, pressed && estilos.botonPresionado]}
+              >
+                <Text style={estilos.botonSecundarioTexto}>Aportar mi cuota</Text>
+              </Pressable>
+            )}
+            <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
+              {aportes.alDia
+                ? `Ya aportaste esta semana · ${siguiente}`
+                : `${aportes.atrasada ? 'Venció' : 'Vence'} el ${formatearFechaConDia(aportes.vence)}`}
+            </Text>
+          </>
+        ) : aportes.alDia ? (
           <>
             <View
               style={[estilos.boton, estilos.botonInactivo]}
@@ -104,11 +137,7 @@ export function InicioScreen({ miCirculo, onAportar }: Props) {
             >
               <Text style={estilos.botonTexto}>Ya aportaste esta semana</Text>
             </View>
-            <Text style={estilos.nota}>
-              {hayOtraSemana
-                ? `La siguiente vence el ${formatearFechaConDia(fechaDeSemana(circulo, circulo.semanaActual + 1))}`
-                : 'Fue la última cuota del círculo'}
-            </Text>
+            <Text style={estilos.nota}>{siguiente}</Text>
           </>
         ) : (
           <>
@@ -207,6 +236,19 @@ const estilos = StyleSheet.create({
   },
   botonPresionado: {
     opacity: 0.85,
+  },
+  botonSecundario: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.cobalto,
+  },
+  botonSecundarioTexto: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.cobalto,
   },
   botonTexto: {
     fontSize: 17,

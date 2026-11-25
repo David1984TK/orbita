@@ -10,6 +10,7 @@ import { crearAportes } from './src/servicios/aportes';
 import { crearCirculos } from './src/servicios/circulos';
 import { crearIdentidad } from './src/servicios/identidad';
 import { crearLlave } from './src/servicios/llave';
+import { crearRetiros } from './src/servicios/retiros';
 import { crearVerificacion } from './src/servicios/verificacion';
 
 // Pasos de la app. Con pocas pantallas basta un estado; cuando la app tenga
@@ -27,6 +28,7 @@ export default function App() {
   const identidad = useMemo(() => crearIdentidad(), []);
   const circulos = useMemo(() => crearCirculos(), []);
   const aportes = useMemo(() => crearAportes(), []);
+  const retiros = useMemo(() => crearRetiros(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
 
   return (
@@ -85,7 +87,7 @@ export default function App() {
         />
       )}
 
-      {paso.nombre === 'principal' && <PrincipalScreen circulos={circulos} aportes={aportes} />}
+      {paso.nombre === 'principal' && <PrincipalScreen circulos={circulos} aportes={aportes} retiros={retiros} />}
 
       <StatusBar style="dark" />
     </SafeAreaProvider>

@@ -49,8 +49,10 @@ export type ResumenDeMiTurno =
   | { tipo: 'yaCobraste'; semana: number };
 
 export function resumenDeMiTurno(circulo: Circulo, yoId: string): ResumenDeMiTurno {
-  const semana = miIntegrante(circulo, yoId).turno;
-  if (semana < circulo.semanaActual) {
+  const yo = miIntegrante(circulo, yoId);
+  const semana = yo.turno;
+  // Si ya retiró el bote, el turno pasó aunque sea esta misma semana.
+  if (semana < circulo.semanaActual || yo.yaRetiro === true) {
     return { tipo: 'yaCobraste', semana };
   }
   const fecha = fechaDeSemana(circulo, semana);
