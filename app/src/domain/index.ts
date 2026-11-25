@@ -50,4 +50,6 @@ export {
   segmentosDeLaRueda,
 } from './rueda';
 export type { EstadoSegmento, ResumenDeAportes, ResumenDeMiTurno } from './rueda';
+export { fraccionDelPuntaje } from './historial';
+export type { Historial, Nivel } from './historial';
 export type { Circulo, Integrante, EstadoPago, Moneda, MiCirculo } from './circulo';

@@ -3,22 +3,24 @@ import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
-import { PantallaProvisional } from '../components/PantallaProvisional';
 import { registrarAporte, registrarRetiro } from '../domain';
 import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
+import type { Historiales } from '../servicios/historial';
 import type { Retiros } from '../servicios/retiros';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
 import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
+import { PerfilScreen } from './PerfilScreen';
 import { RetirarScreen } from './RetirarScreen';
 
 type Props = {
   circulos: Circulos;
   aportes: Aportes;
   retiros: Retiros;
+  historiales: Historiales;
 };
 
 /** Dentro de "Círculo": la pantalla de siempre o uno de los pasos cortos. */
@@ -34,12 +36,12 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
 /**
  * La app una vez dentro: la barra de pestañas y la pantalla de cada una.
  *
- * Existen "Círculo" (con "Aportar" y "Tu turno" dentro) y "Grupo". "Perfil" es
- * un marcador de lugar. "Círculo" y "Grupo" leen el mismo círculo, así que
- * comparten la carga y sus avisos. Mientras se aporta o se retira no se ve la
+ * Existen "Círculo" (con "Aportar" y "Tu turno" dentro), "Grupo" y "Perfil" (mi
+ * historial). "Círculo" y "Grupo" leen el mismo círculo, así que comparten la
+ * carga y sus avisos; "Perfil" pide su propio historial. Mientras se aporta o se retira no se ve la
  * barra de pestañas: son pasos cortos que se confirman o se cancelan.
  */
-export function PrincipalScreen({ circulos, aportes, retiros }: Props) {
+export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [vista, setVista] = useState<Vista>('inicio');
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
@@ -163,9 +165,7 @@ export function PrincipalScreen({ circulos, aportes, retiros }: Props) {
 
         {pestana === 'grupo' && carga.tipo === 'listo' && <GrupoScreen miCirculo={carga.miCirculo} />}
 
-        {pestana === 'perfil' && (
-          <PantallaProvisional texto="Aquí va «Mi historial». Todavía no existe." />
-        )}
+        {pestana === 'perfil' && <PerfilScreen historiales={historiales} />}
       </View>
 
       {!enPasoAparte && <BarraPestanas activa={pestana} onCambiar={cambiarPestana} />}

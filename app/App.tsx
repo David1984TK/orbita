@@ -8,6 +8,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { PrincipalScreen } from './src/screens/PrincipalScreen';
 import { crearAportes } from './src/servicios/aportes';
 import { crearCirculos } from './src/servicios/circulos';
+import { crearHistoriales } from './src/servicios/historial';
 import { crearIdentidad } from './src/servicios/identidad';
 import { crearLlave } from './src/servicios/llave';
 import { crearRetiros } from './src/servicios/retiros';
@@ -29,6 +30,7 @@ export default function App() {
   const circulos = useMemo(() => crearCirculos(), []);
   const aportes = useMemo(() => crearAportes(), []);
   const retiros = useMemo(() => crearRetiros(), []);
+  const historiales = useMemo(() => crearHistoriales(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
 
   return (
@@ -87,7 +89,12 @@ export default function App() {
         />
       )}
 
-      {paso.nombre === 'principal' && <PrincipalScreen circulos={circulos} aportes={aportes} retiros={retiros} />}
+      {paso.nombre === 'principal' && <PrincipalScreen
+          circulos={circulos}
+          aportes={aportes}
+          retiros={retiros}
+          historiales={historiales}
+        />}
 
       <StatusBar style="dark" />
     </SafeAreaProvider>

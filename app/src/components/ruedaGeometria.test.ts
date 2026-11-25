@@ -1,4 +1,4 @@
-import { trazoDeSegmento } from './ruedaGeometria';
+import { trazoDeArco, trazoDeSegmento } from './ruedaGeometria';
 
 describe('trazoDeSegmento', () => {
   it('el primer segmento de cuatro va de las 12 a las 3, sin hueco', () => {
@@ -25,5 +25,25 @@ describe('trazoDeSegmento', () => {
 
   it('con un solo segmento pide el arco grande', () => {
     expect(trazoDeSegmento(0, 1, 100, 100, 50, 10)).toContain('A 50 50 0 1 1');
+  });
+});
+
+describe('trazoDeArco', () => {
+  it('un cuarto de vuelta desde arriba va de las 12 a las 3', () => {
+    expect(trazoDeArco(100, 100, 50, 0, 90)).toBe('M 100 50 A 50 50 0 0 1 150 100');
+  });
+
+  it('acepta ángulos que pasan de 360: de las 9 a las 3 por arriba', () => {
+    // De 270° a 450° (= 90°) cruza las 12.
+    expect(trazoDeArco(100, 100, 50, 270, 450)).toBe('M 50 100 A 50 50 0 0 1 150 100');
+  });
+
+  it('pide el arco grande cuando pasa de media vuelta', () => {
+    expect(trazoDeArco(100, 100, 50, 225, 495)).toContain('A 50 50 0 1 1');
+    expect(trazoDeArco(100, 100, 50, 0, 180)).toContain('A 50 50 0 0 1');
+  });
+
+  it('un segmento es un arco: ambos trazos coinciden', () => {
+    expect(trazoDeSegmento(1, 4, 100, 100, 50, 0)).toBe(trazoDeArco(100, 100, 50, 90, 180));
   });
 });

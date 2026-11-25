@@ -4,6 +4,8 @@ import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import { circuloDeEjemplo } from '../servicios/circulos';
 import type { Circulos } from '../servicios/circulos';
+import { historialDeEjemplo } from '../servicios/historial';
+import type { Historiales } from '../servicios/historial';
 import type { Retiros } from '../servicios/retiros';
 import { PrincipalScreen } from './PrincipalScreen';
 
@@ -38,8 +40,16 @@ async function abrir(
   const circulos: Circulos = { obtenerMiCirculo: jest.fn(obtener) };
   const aportes: Aportes = { aportar: jest.fn(aportar) };
   const retiros: Retiros = { retirar: jest.fn(retirar) };
-  await render(<PrincipalScreen circulos={circulos} aportes={aportes} retiros={retiros} />);
-  return { circulos, aportes, retiros };
+  const historiales: Historiales = { obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) };
+  await render(
+    <PrincipalScreen
+      circulos={circulos}
+      aportes={aportes}
+      retiros={retiros}
+      historiales={historiales}
+    />,
+  );
+  return { circulos, aportes, retiros, historiales };
 }
 
 const botonConfirmar = () => screen.getByRole('button', { name: /Confirmar con/ });
@@ -96,7 +106,7 @@ describe('PrincipalScreen', () => {
     expect(pestana('Grupo').props.accessibilityState.selected).toBe(true);
 
     await fireEvent.press(pestana('Perfil'));
-    expect(screen.getByText(/Aquí va «Mi historial»/)).toBeTruthy();
+    expect(await screen.findByText('Mi historial')).toBeTruthy();
 
     await fireEvent.press(pestana('Círculo'));
     expect(screen.getByText('Los del mercado')).toBeTruthy();
@@ -308,5 +318,17 @@ describe('PrincipalScreen', () => {
       expect(screen.getByText('Los del mercado')).toBeTruthy();
       espia.mockRestore();
     });
+  });
+
+  it('la pestaña Perfil pide el historial y lo muestra, con la barra de pestañas', async () => {
+    const { historiales } = await abrir();
+    await screen.findByText('Los del mercado');
+
+    await fireEvent.press(pestana('Perfil'));
+
+    expect(await screen.findByText('Básico')).toBeTruthy();
+    expect(screen.getByText('Ahorrado con Órbita')).toBeTruthy();
+    expect(pestana('Perfil').props.accessibilityState.selected).toBe(true);
+    expect(historiales.obtenerMiHistorial).toHaveBeenCalledTimes(1);
   });
 });
