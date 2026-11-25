@@ -103,6 +103,73 @@ describe('crear un círculo', () => {
     expect(new Set(ids).size).toBe(15);
   });
 
+  describe('cuando el círculo se llena y arranca', () => {
+    const borrador = { nombre: 'Los del mercado', integrantes: 5, cuota: 600, moneda: 'pesos' } as const;
+
+    async function llenado() {
+      const circulos = crearCirculos(true);
+      const creado = await circulos.crearCirculo(borrador);
+      if (!creado.ok) {
+        throw new Error('se esperaba que se creara');
+      }
+      const id = creado.enFormacion.id;
+      for (let i = 0; i < 4; i += 1) {
+        await circulos.obtenerEnFormacion(id);
+      }
+      return { circulos, id };
+    }
+
+    it('mientras falta gente todavía no arrancó', async () => {
+      const circulos = crearCirculos(true);
+      const creado = await circulos.crearCirculo(borrador);
+      if (!creado.ok) {
+        throw new Error('se esperaba que se creara');
+      }
+      await circulos.obtenerEnFormacion(creado.enFormacion.id);
+
+      expect(await circulos.obtenerArranque(creado.enFormacion.id)).toBeNull();
+    });
+
+    it('al llenarse arranca: semana 1 y quien lo creó sigue siendo "yo"', async () => {
+      const { circulos, id } = await llenado();
+
+      const arranque = await circulos.obtenerArranque(id);
+
+      expect(arranque).not.toBeNull();
+      expect(arranque!.yoId).toBe('yo');
+      expect(arranque!.circulo).toMatchObject({
+        id,
+        nombre: 'Los del mercado',
+        cuotaSemanal: 600,
+        semanaActual: 1,
+      });
+      expect(arranque!.circulo.integrantes).toHaveLength(5);
+    });
+
+    it('cada integrante tiene un turno distinto del 1 al total', async () => {
+      const { circulos, id } = await llenado();
+
+      const turnos = (await circulos.obtenerArranque(id))!.circulo.integrantes
+        .map((i) => i.turno)
+        .sort((a, b) => a - b);
+
+      expect(turnos).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('la primera cuota vence dentro de una semana, y nadie ha pagado todavía', async () => {
+      const { circulos, id } = await llenado();
+
+      const { circulo } = (await circulos.obtenerArranque(id))!;
+
+      expect(circulo.integrantes.every((i) => i.cuotasPagadas === 0 && i.estado === 'pendiente')).toBe(true);
+      expect(circulo.inicio).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('preguntar por un círculo que no existe lanza un error', async () => {
+      await expect(crearCirculos(true).obtenerArranque('no-existe')).rejects.toThrow(/no-existe/);
+    });
+  });
+
   it('pedir el avance de un círculo que no existe lanza un error', async () => {
     await expect(crearCirculos(true).obtenerEnFormacion('no-existe')).rejects.toThrow(/no-existe/);
   });
@@ -116,6 +183,7 @@ describe('círculos fuera de desarrollo', () => {
   it('nunca enseña círculos en formación inventados', async () => {
     await expect(crearCirculos(false).obtenerCirculosEnFormacion()).rejects.toThrow();
     await expect(crearCirculos(false).obtenerEnFormacion('x')).rejects.toThrow();
+    await expect(crearCirculos(false).obtenerArranque('x')).rejects.toThrow();
   });
 
   it('nunca dice que creó un círculo: falla por no haber contratos', async () => {

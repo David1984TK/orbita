@@ -5,6 +5,7 @@
 // desarrollo. Cuando haya de dónde leer el círculo se cambia la implementación
 // y las pantallas no se enteran.
 
+import { arrancarCirculo, estaLleno, fechaDeHoy, sumarDias } from '../domain';
 import type {
   BorradorDeCirculo,
   Circulo,
@@ -41,6 +42,12 @@ export type Circulos = {
   obtenerCirculosEnFormacion(): Promise<CirculoEnFormacion[]>;
   /** Cómo va un círculo en formación: quién ya entró. Lanza un error si no se pudo consultar. */
   obtenerEnFormacion(id: string): Promise<CirculoEnFormacion>;
+  /**
+   * El círculo ya en curso, si el que se estaba llenando ya arrancó (entraron
+   * todas y el contrato asignó los turnos), o `null` si todavía no. Lanza un error
+   * si no se pudo consultar.
+   */
+  obtenerArranque(id: string): Promise<MiCirculo | null>;
 };
 
 const NOMBRES = [
@@ -184,6 +191,24 @@ function crearSimulados(): Circulos {
       const despues = enFormacion[indice];
       return { ...despues, participantes: [...despues.participantes] };
     },
+    async obtenerArranque(id) {
+      const formacion = enFormacion.find((c) => c.id === id);
+      if (formacion === undefined) {
+        throw new Error(`No existe el círculo en formación "${id}".`);
+      }
+      if (!estaLleno(formacion)) {
+        return null;
+      }
+      // Los turnos de la versión simulada son una rotación del orden de entrada:
+      // son de mentira. Los reales los asigna el contrato.
+      const total = formacion.participantes.length;
+      const turnos: Record<string, number> = {};
+      formacion.participantes.forEach((participante, i) => {
+        turnos[participante.id] = ((i + 3) % total) + 1;
+      });
+      // La primera cuota vence en una semana.
+      return arrancarCirculo(formacion, turnos, sumarDias(fechaDeHoy(), 7));
+    },
   };
 }
 
@@ -202,6 +227,9 @@ const sinContratos: Circulos = {
   },
   async obtenerEnFormacion() {
     throw new Error('Todavía no hay de dónde leer los círculos en formación.');
+  },
+  async obtenerArranque() {
+    throw new Error('Todavía no hay de dónde leer si un círculo ya arrancó.');
   },
 };
 

@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  boteDelCirculo,
   estaLleno,
   formatearMonto,
   iniciales,
   lugaresDelCirculo,
   mensajeDeInvitacion,
+  resumenDeMiTurno,
   textoDeFaltantesDelCirculo,
 } from '../domain';
-import type { CirculoEnFormacion } from '../domain';
+import type { CirculoEnFormacion, MiCirculo } from '../domain';
 import type { ResultadoDeCompartir } from '../servicios/compartir';
 import { colors } from '../theme';
 
@@ -22,6 +24,18 @@ type Props = {
   onActualizado: (circulo: CirculoEnFormacion) => void;
   /** Abre el cuadro de compartir con el mensaje de invitación. */
   onCompartir: (mensaje: string) => Promise<ResultadoDeCompartir>;
+  /**
+   * Cuando el círculo se llena, pregunta si ya arrancó: devuelve el círculo en
+   * curso, o `null` si todavía no. Si lanza un error se vuelve a intentar.
+   */
+  obtenerArranque: () => Promise<MiCirculo | null>;
+  /**
+   * `true` si la app puede mostrar el círculo que arrancó como "Mi círculo". Hoy
+   * solo muestra uno: si la persona ya está en otro, todavía no.
+   */
+  puedeVerlo: boolean;
+  /** La persona quiere ver su círculo ya en marcha. */
+  onVerCirculo: (circulo: MiCirculo) => void;
   /** Si se da, muestra "‹ Volver" para regresar a donde estaba la persona. */
   onVolver?: () => void;
   /** Cada cuántos milisegundos se vuelve a consultar. */
@@ -34,17 +48,23 @@ const MENSAJE_ERROR_AL_COMPARTIR = 'No pudimos abrir el cuadro de compartir. Int
 /**
  * Un círculo que se está llenando: ya se creó, falta que entren las demás
  * personas. Se invita mandando el enlace por WhatsApp, y la pantalla se
- * actualiza sola conforme van entrando. Cuando entran todas, el círculo arranca.
+ * actualiza sola conforme van entrando. Cuando entran todas, el círculo arranca:
+ * la pantalla lo anuncia, dice cuál es el turno de la persona y deja pasar a "Mi
+ * círculo".
  */
 export function FormandoScreen({
   circulo: inicial,
   obtener,
   onActualizado,
   onCompartir,
+  obtenerArranque,
+  puedeVerlo,
+  onVerCirculo,
   onVolver,
   intervaloMs = INTERVALO_POR_DEFECTO,
 }: Props) {
   const [circulo, setCirculo] = useState(inicial);
+  const [arranque, setArranque] = useState<MiCirculo | null>(null);
   const [sinConexion, setSinConexion] = useState(false);
   const [compartiendo, setCompartiendo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -52,10 +72,43 @@ export function FormandoScreen({
 
   // Se guardan las últimas funciones para que la consulta periódica use siempre
   // las vigentes sin reiniciar el temporizador.
-  const ultimas = useRef({ obtener, onActualizado });
-  ultimas.current = { obtener, onActualizado };
+  const ultimas = useRef({ obtener, onActualizado, obtenerArranque });
+  ultimas.current = { obtener, onActualizado, obtenerArranque };
 
   const lleno = estaLleno(circulo);
+
+  // Ya entraron todas: se pregunta si el círculo arrancó (el contrato asigna los
+  // turnos), de inmediato y luego cada pocos segundos hasta que sí.
+  useEffect(() => {
+    if (!lleno || arranque !== null) {
+      return undefined;
+    }
+    let activo = true;
+
+    async function consultar() {
+      try {
+        const arrancado = await ultimas.current.obtenerArranque();
+        if (!activo) {
+          return;
+        }
+        setSinConexion(false);
+        if (arrancado !== null) {
+          setArranque(arrancado);
+        }
+      } catch {
+        if (activo) {
+          setSinConexion(true);
+        }
+      }
+    }
+
+    void consultar();
+    const id = setInterval(() => void consultar(), intervaloMs);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [lleno, arranque, intervaloMs]);
 
   useEffect(() => {
     if (lleno) {
@@ -108,6 +161,8 @@ export function FormandoScreen({
 
   const lugares = lugaresDelCirculo(circulo);
   const dinero = (monto: number) => formatearMonto(monto, circulo.moneda);
+  // Con el círculo ya en marcha: cuál es el turno de la persona.
+  const turno = arranque === null ? null : resumenDeMiTurno(arranque.circulo, arranque.yoId);
 
   return (
     <SafeAreaView edges={['top']} style={estilos.pantalla}>
@@ -125,7 +180,7 @@ export function FormandoScreen({
         )}
 
         <View style={estilos.encabezado}>
-          <Text style={estilos.etiqueta}>EN FORMACIÓN</Text>
+          <Text style={estilos.etiqueta}>{arranque === null ? 'EN FORMACIÓN' : 'YA ARRANCÓ'}</Text>
           <Text style={estilos.titulo} accessibilityRole="header">
             {circulo.nombre}
           </Text>
@@ -135,13 +190,29 @@ export function FormandoScreen({
         </View>
 
         <View style={estilos.estado}>
-          <Text style={estilos.faltan}>{textoDeFaltantesDelCirculo(circulo)}</Text>
+          <Text style={estilos.faltan}>
+            {arranque === null ? textoDeFaltantesDelCirculo(circulo) : '¡Tu círculo arrancó!'}
+          </Text>
           <Text style={estilos.faltanDetalle}>
-            {lleno
-              ? 'Tu círculo está por arrancar. En cuanto arranque lo verás en «Mi círculo».'
-              : 'Cuando entren todas, el círculo arranca.'}
+            {arranque !== null
+              ? 'Ya cada integrante tiene su turno.'
+              : lleno
+                ? 'Tu círculo está arrancando…'
+                : 'Cuando entren todas, el círculo arranca.'}
           </Text>
         </View>
+
+        {arranque !== null && turno !== null && (
+          <View style={estilos.tarjeta}>
+            <View style={estilos.invitar}>
+              <Text style={estilos.invitarTitulo}>Tu turno: semana {turno.semana}</Text>
+              <Text style={estilos.invitarTexto}>
+                Recibes {dinero(boteDelCirculo(arranque.circulo))} cuando te toque. La primera cuota
+                es de {dinero(arranque.circulo.cuotaSemanal)}.
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View
           style={estilos.lugares}
@@ -230,7 +301,9 @@ export function FormandoScreen({
 
         {sinConexion && (
           <Text style={estilos.sinConexion} accessibilityRole="alert">
-            No pudimos revisar quién entró. Seguimos intentando.
+            {lleno
+              ? 'No pudimos revisar si ya arrancó. Seguimos intentando.'
+              : 'No pudimos revisar quién entró. Seguimos intentando.'}
           </Text>
         )}
       </ScrollView>
@@ -258,6 +331,35 @@ export function FormandoScreen({
               {compartiendo ? 'Abriendo…' : 'Compartir por WhatsApp'}
             </Text>
           </Pressable>
+        </View>
+      )}
+
+      {arranque !== null && (
+        <View style={estilos.pie}>
+          {puedeVerlo ? (
+            <Pressable
+              onPress={() => onVerCirculo(arranque)}
+              accessibilityRole="button"
+              style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+            >
+              <Text style={estilos.botonTexto}>Ver mi círculo</Text>
+            </Pressable>
+          ) : (
+            // La app todavía muestra un solo círculo: si la persona ya está en otro,
+            // este no se puede ver aquí hasta que haya una lista de círculos.
+            <>
+              <Text style={estilos.nota}>
+                Ya estás en otro círculo. Cuando puedas ver varios, este aparecerá en «Mi círculo».
+              </Text>
+              <Pressable
+                onPress={onVolver}
+                accessibilityRole="button"
+                style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+              >
+                <Text style={estilos.botonTexto}>Entendido</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       )}
     </SafeAreaView>

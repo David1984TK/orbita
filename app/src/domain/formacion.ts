@@ -5,7 +5,7 @@
 // Es un tipo aparte de `Circulo` a propósito: un círculo en curso siempre tiene a
 // todas sus integrantes y su semana en marcha, y uno en formación todavía no.
 
-import type { Moneda } from './circulo';
+import type { Circulo, Integrante, MiCirculo, Moneda } from './circulo';
 import { formatearMonto } from './formato';
 
 export type Participante = {
@@ -69,4 +69,56 @@ export function mensajeDeInvitacion(circulo: CirculoEnFormacion): string {
     `juntas, con ${cuota} cada semana, y cada quien recibe ${bote} en su turno. ` +
     `Entra aquí: ${circulo.enlace}`
   );
+}
+
+/**
+ * El círculo ya en curso, a partir de uno que se llenó. Cuando entra la última
+ * persona el círculo arranca: empieza en la semana 1, cada integrante tiene su
+ * turno y debe su primera cuota.
+ *
+ * Los turnos no los decide la app: los asigna el contrato (la regla del plan los
+ * liga al historial y al riesgo). Esta función solo convierte lo que llegó, y por
+ * eso revisa que sea coherente: que el círculo esté lleno y que cada persona
+ * tenga un turno distinto del 1 al total. Lanza un error si no.
+ *
+ * `inicio` es el día en que vence la cuota de la semana 1 ("AAAA-MM-DD").
+ */
+export function arrancarCirculo(
+  formacion: CirculoEnFormacion,
+  turnos: Record<string, number>,
+  inicio: string,
+): MiCirculo {
+  if (!estaLleno(formacion)) {
+    throw new Error(`El círculo "${formacion.id}" todavía no se llena: no puede arrancar.`);
+  }
+  const total = formacion.participantes.length;
+  const usados = new Set<number>();
+  const integrantes: Integrante[] = formacion.participantes.map((participante) => {
+    const turno = turnos[participante.id];
+    if (!Number.isInteger(turno) || turno < 1 || turno > total) {
+      throw new Error(`"${participante.id}" no tiene un turno válido (del 1 al ${total}).`);
+    }
+    if (usados.has(turno)) {
+      throw new Error(`El turno ${turno} está repetido.`);
+    }
+    usados.add(turno);
+    return {
+      id: participante.id,
+      nombre: participante.nombre,
+      turno,
+      estado: 'pendiente',
+      cuotasPagadas: 0,
+    };
+  });
+
+  const circulo: Circulo = {
+    id: formacion.id,
+    nombre: formacion.nombre,
+    moneda: formacion.moneda,
+    cuotaSemanal: formacion.cuotaSemanal,
+    integrantes,
+    semanaActual: 1,
+    inicio,
+  };
+  return { circulo, yoId: formacion.organizadorId };
 }

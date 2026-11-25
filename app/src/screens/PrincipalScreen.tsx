@@ -190,6 +190,17 @@ export function PrincipalScreen({
     setEnFormacion((lista) => lista.map((c) => (c.id === actualizado.id ? actualizado : c)));
   }
 
+  // El círculo que se llenaba ya arrancó: pasa a ser "Mi círculo". Solo se llega
+  // aquí cuando la persona no tiene otro círculo en curso, porque la app todavía
+  // muestra uno solo.
+  function pasarAMiCirculo(arrancado: MiCirculo) {
+    setCarga({ tipo: 'listo', miCirculo: arrancado });
+    setEnFormacion((lista) => lista.filter((c) => c.id !== arrancado.circulo.id));
+    setFormandoId(null);
+    setPestana('circulo');
+    setVista('inicio');
+  }
+
   async function confirmarAporte(total: number) {
     if (carga.tipo !== 'listo') {
       return { ok: false, motivo: 'error' } as const;
@@ -256,6 +267,9 @@ export function PrincipalScreen({
             obtener={() => circulos.obtenerEnFormacion(viendoFormacion.id)}
             onActualizado={actualizarFormacion}
             onCompartir={(mensaje) => compartir.compartir(mensaje)}
+            obtenerArranque={() => circulos.obtenerArranque(viendoFormacion.id)}
+            puedeVerlo={carga.tipo !== 'listo'}
+            onVerCirculo={pasarAMiCirculo}
             onVolver={() => setVista('inicio')}
           />
         )}
@@ -309,6 +323,9 @@ export function PrincipalScreen({
             obtener={() => circulos.obtenerEnFormacion(formacionPrincipal.id)}
             onActualizado={actualizarFormacion}
             onCompartir={(mensaje) => compartir.compartir(mensaje)}
+            obtenerArranque={() => circulos.obtenerArranque(formacionPrincipal.id)}
+            puedeVerlo
+            onVerCirculo={pasarAMiCirculo}
           />
         )}
 

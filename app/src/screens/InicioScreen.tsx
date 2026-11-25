@@ -5,6 +5,7 @@ import type { Aviso } from '../components/PilaDeAvisos';
 import { Rueda } from '../components/Rueda';
 import {
   boteDelCirculo,
+  estaLleno,
   fechaDeSemana,
   fechaLocalDe,
   formatearFecha,
@@ -107,14 +108,27 @@ export function InicioScreen({
             onPress: () => onVerSolicitud?.(),
           },
         ]),
-    ...enFormacion.map((formando) => ({
-      id: `formando-${formando.id}`,
-      etiqueta: `Estás formando ${formando.nombre}. ${textoDeFaltantesDelCirculo(formando)}.`,
-      antes: 'Estás formando ',
-      negrita: `«${formando.nombre}»`,
-      despues: ` · ${textoDeFaltantesDelCirculo(formando)}`,
-      onPress: () => onVerFormacion?.(formando.id),
-    })),
+    ...enFormacion.map((formando) =>
+      // Un círculo lleno es un círculo que ya arrancó: se avisa así, no como si
+      // todavía se estuviera formando.
+      estaLleno(formando)
+        ? {
+            id: `formando-${formando.id}`,
+            etiqueta: `Tu círculo ${formando.nombre} ya arrancó.`,
+            antes: 'Tu círculo ',
+            negrita: `«${formando.nombre}»`,
+            despues: ' ya arrancó',
+            onPress: () => onVerFormacion?.(formando.id),
+          }
+        : {
+            id: `formando-${formando.id}`,
+            etiqueta: `Estás formando ${formando.nombre}. ${textoDeFaltantesDelCirculo(formando)}.`,
+            antes: 'Estás formando ',
+            negrita: `«${formando.nombre}»`,
+            despues: ` · ${textoDeFaltantesDelCirculo(formando)}`,
+            onPress: () => onVerFormacion?.(formando.id),
+          },
+    ),
   ];
 
   return (

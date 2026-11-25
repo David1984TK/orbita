@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import type { CirculoEnFormacion } from '../domain';
+import { arrancarCirculo } from '../domain';
+import type { CirculoEnFormacion, MiCirculo } from '../domain';
 import { formacionDeEjemplo } from '../servicios/circulos';
 import type { ResultadoDeCompartir } from '../servicios/compartir';
 import { FormandoScreen } from './FormandoScreen';
@@ -33,12 +34,23 @@ type Opciones = {
   obtener?: () => Promise<CirculoEnFormacion>;
   compartir?: (mensaje: string) => Promise<ResultadoDeCompartir>;
   conVolver?: boolean;
+  arranque?: () => Promise<MiCirculo | null>;
+  puedeVerlo?: boolean;
 };
 
-async function abrir({ circulo = conGente(1), obtener, compartir, conVolver = false }: Opciones = {}) {
+async function abrir({
+  circulo = conGente(1),
+  obtener,
+  compartir,
+  conVolver = false,
+  arranque,
+  puedeVerlo = true,
+}: Opciones = {}) {
   const consultar = jest.fn(obtener ?? (async () => circulo));
   const onActualizado = jest.fn();
   const onCompartir = jest.fn(compartir ?? (async (): Promise<ResultadoDeCompartir> => 'compartido'));
+  const consultarArranque = jest.fn(arranque ?? (async (): Promise<MiCirculo | null> => null));
+  const onVerCirculo = jest.fn();
   const onVolver = jest.fn();
   await render(
     <FormandoScreen
@@ -46,11 +58,29 @@ async function abrir({ circulo = conGente(1), obtener, compartir, conVolver = fa
       obtener={consultar}
       onActualizado={onActualizado}
       onCompartir={onCompartir}
+      obtenerArranque={consultarArranque}
+      puedeVerlo={puedeVerlo}
+      onVerCirculo={onVerCirculo}
       onVolver={conVolver ? onVolver : undefined}
       intervaloMs={INTERVALO}
     />,
   );
-  return { consultar, onActualizado, onCompartir, onVolver };
+  return { consultar, onActualizado, onCompartir, consultarArranque, onVerCirculo, onVolver };
+}
+
+// Un círculo de 5 personas ya lleno, y ese mismo círculo ya arrancado: quien lo creó
+// (David Nava, "yo") tiene el turno 4.
+const llenoDe5 = () =>
+  formacionDeEjemplo({ integrantes: 5, participantes: conGente(5).participantes });
+
+function arrancado(turnoDeYo = 4): MiCirculo {
+  const formacion = llenoDe5();
+  const turnos: Record<string, number> = {};
+  const otros = [1, 2, 3, 4, 5].filter((t) => t !== turnoDeYo);
+  formacion.participantes.forEach((p) => {
+    turnos[p.id] = p.id === 'yo' ? turnoDeYo : otros.shift()!;
+  });
+  return arrancarCirculo(formacion, turnos, '2026-12-07');
 }
 
 beforeEach(() => {
@@ -228,7 +258,7 @@ describe('FormandoScreen', () => {
       expect(consultar.mock.calls.length).toBe(consultasAlLlenarse);
       expect(screen.queryByRole('button', { name: 'Compartir por WhatsApp' })).toBeNull();
       expect(screen.queryByText('Invita por WhatsApp')).toBeNull();
-      expect(screen.getByText(/Tu círculo está por arrancar/)).toBeTruthy();
+      expect(screen.getByText('Tu círculo está arrancando…')).toBeTruthy();
     });
 
     it('si ya estaba lleno al abrirla no consulta ni ofrece invitar', async () => {
@@ -271,6 +301,9 @@ describe('FormandoScreen', () => {
           obtener={consultar}
           onActualizado={() => {}}
           onCompartir={async () => 'compartido'}
+          obtenerArranque={async () => null}
+          puedeVerlo
+          onVerCirculo={() => {}}
           intervaloMs={INTERVALO}
         />,
       );
@@ -297,6 +330,148 @@ describe('FormandoScreen', () => {
       await abrir({ conVolver: false });
 
       expect(screen.queryByRole('button', { name: 'Volver' })).toBeNull();
+    });
+  });
+
+  describe('cuando se llena y el círculo arranca', () => {
+    it('mientras falta gente nunca pregunta si arrancó', async () => {
+      const { consultarArranque } = await abrir({ circulo: conGente(2) });
+
+      await pasar(INTERVALO * 3);
+
+      expect(consultarArranque).not.toHaveBeenCalled();
+    });
+
+    it('ya lleno pregunta de inmediato si arrancó, y sigue preguntando hasta que sí', async () => {
+      let respuestas = 0;
+      const { consultarArranque } = await abrir({
+        circulo: llenoDe5(),
+        arranque: async () => {
+          respuestas += 1;
+          return respuestas >= 3 ? arrancado() : null;
+        },
+      });
+      expect(consultarArranque).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('Ya entraron todas')).toBeTruthy();
+      expect(screen.getByText('Tu círculo está arrancando…')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
+
+      await pasar(INTERVALO);
+      expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
+      await pasar(INTERVALO);
+
+      expect(screen.getByRole('button', { name: 'Ver mi círculo' })).toBeTruthy();
+    });
+
+    it('al arrancar lo anuncia y dice cuál es el turno de la persona y cuánto recibe', async () => {
+      await abrir({ circulo: llenoDe5(), arranque: async () => arrancado(4) });
+
+      expect(await screen.findByText('¡Tu círculo arrancó!')).toBeTruthy();
+      expect(screen.getByText('YA ARRANCÓ')).toBeTruthy();
+      expect(screen.queryByText('EN FORMACIÓN')).toBeNull();
+      expect(screen.getByText('Ya cada integrante tiene su turno.')).toBeTruthy();
+      expect(screen.getByText('Tu turno: semana 4')).toBeTruthy();
+      expect(
+        screen.getByText(/Recibes \$3,000 cuando te toque\. La primera cuota\s+es de \$600\./),
+      ).toBeTruthy();
+    });
+
+    it('el turno sale del círculo ya arrancado, no de un número fijo', async () => {
+      await abrir({ circulo: llenoDe5(), arranque: async () => arrancado(1) });
+
+      expect(await screen.findByText('Tu turno: semana 1')).toBeTruthy();
+    });
+
+    it('al arrancar deja de preguntar', async () => {
+      const { consultarArranque } = await abrir({ circulo: llenoDe5(), arranque: async () => arrancado() });
+      await screen.findByText('¡Tu círculo arrancó!');
+      const antes = consultarArranque.mock.calls.length;
+
+      await pasar(INTERVALO * 4);
+
+      expect(consultarArranque.mock.calls.length).toBe(antes);
+    });
+
+    it('"Ver mi círculo" entrega el círculo ya en curso', async () => {
+      const circuloEnCurso = arrancado();
+      const { onVerCirculo } = await abrir({ circulo: llenoDe5(), arranque: async () => circuloEnCurso });
+
+      await fireEvent.press(await screen.findByRole('button', { name: 'Ver mi círculo' }));
+
+      expect(onVerCirculo).toHaveBeenCalledTimes(1);
+      expect(onVerCirculo).toHaveBeenCalledWith(circuloEnCurso);
+    });
+
+    it('ya no ofrece invitar ni compartir', async () => {
+      await abrir({ circulo: llenoDe5(), arranque: async () => arrancado() });
+      await screen.findByText('¡Tu círculo arrancó!');
+
+      expect(screen.queryByText('Invita por WhatsApp')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Compartir por WhatsApp' })).toBeNull();
+    });
+
+    it('si la persona ya está en otro círculo, lo dice en vez de ofrecer verlo', async () => {
+      const { onVolver, onVerCirculo } = await abrir({
+        circulo: llenoDe5(),
+        arranque: async () => arrancado(),
+        puedeVerlo: false,
+        conVolver: true,
+      });
+      await screen.findByText('¡Tu círculo arrancó!');
+
+      expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
+      expect(
+        screen.getByText(/Ya estás en otro círculo\. Cuando puedas ver varios, este aparecerá/),
+      ).toBeTruthy();
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Entendido' }));
+
+      expect(onVolver).toHaveBeenCalledTimes(1);
+      expect(onVerCirculo).not.toHaveBeenCalled();
+    });
+
+    it('si no puede preguntar si arrancó avisa, sigue intentando y lo quita al conseguirlo', async () => {
+      let falla = true;
+      await abrir({
+        circulo: llenoDe5(),
+        arranque: async () => {
+          if (falla) {
+            throw new Error('sin conexión');
+          }
+          return arrancado();
+        },
+      });
+
+      expect(await screen.findByText(/No pudimos revisar si ya arrancó\. Seguimos intentando\./)).toBeTruthy();
+
+      falla = false;
+      await pasar(INTERVALO);
+
+      expect(screen.queryByText(/No pudimos revisar si ya arrancó/)).toBeNull();
+      expect(screen.getByText('¡Tu círculo arrancó!')).toBeTruthy();
+    });
+
+    it('al salir de la pantalla deja de preguntar', async () => {
+      const preguntar = jest.fn(async () => null);
+      const { unmount } = await render(
+        <FormandoScreen
+          circulo={llenoDe5()}
+          obtener={async () => llenoDe5()}
+          onActualizado={() => {}}
+          onCompartir={async () => 'compartido'}
+          obtenerArranque={preguntar}
+          puedeVerlo
+          onVerCirculo={() => {}}
+          intervaloMs={INTERVALO}
+        />,
+      );
+      await pasar(INTERVALO);
+      const antes = preguntar.mock.calls.length;
+
+      await unmount();
+      await pasar(INTERVALO * 4);
+
+      expect(preguntar.mock.calls.length).toBe(antes);
     });
   });
 });

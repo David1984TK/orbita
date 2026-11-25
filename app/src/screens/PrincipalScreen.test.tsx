@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
 import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
+import { arrancarCirculo } from '../domain';
 import type { CirculoEnFormacion } from '../domain';
 import { circuloDeEjemplo, formacionDeEjemplo } from '../servicios/circulos';
 import type { Circulos, ResultadoDeCreacion } from '../servicios/circulos';
@@ -62,6 +63,7 @@ async function abrir(
   solicitud: SolicitudDeRecuperacion | null = null,
   formando: CirculoEnFormacion[] = [],
   alCompartir: (mensaje: string) => Promise<ResultadoDeCompartir> = async () => 'compartido',
+  arranque: MiCirculo | null = null,
 ) {
   const circulos: Circulos = {
     obtenerMiCirculo: jest.fn(obtener),
@@ -70,6 +72,7 @@ async function abrir(
     obtenerEnFormacion: jest.fn(
       async (id: string) => formando.find((c) => c.id === id) ?? formacionDeEjemplo({ id }),
     ),
+    obtenerArranque: jest.fn(async () => arranque),
   };
   const compartir: Compartir = { compartir: jest.fn(alCompartir) };
   const aportes: Aportes = { aportar: jest.fn(aportar) };
@@ -615,6 +618,87 @@ describe('PrincipalScreen', () => {
       }
     });
 
+    describe('cuando el círculo se llena y arranca', () => {
+      // Un círculo lleno de 5 personas ("Las del taller") y ese mismo círculo ya en curso.
+      const lleno = () =>
+        formacionDeEjemplo({
+          id: 'las-del-taller',
+          nombre: 'Las del taller',
+          integrantes: 5,
+          cuotaSemanal: 500,
+          participantes: [
+            { id: 'yo', nombre: 'David Nava' },
+            { id: 'a', nombre: 'Rosa Martínez' },
+            { id: 'b', nombre: 'Julio Lara' },
+            { id: 'c', nombre: 'Ana Torres' },
+            { id: 'd', nombre: 'Carmen Ruiz' },
+          ],
+        });
+      const enCurso = () =>
+        arrancarCirculo(lleno(), { yo: 4, a: 1, b: 2, c: 3, d: 5 }, '2026-12-07');
+
+      it('sin otro círculo, "Ver mi círculo" lo convierte en "Mi círculo"', async () => {
+        await abrir(async () => null, undefined, undefined, undefined, null, [lleno()], undefined, enCurso());
+        expect(await screen.findByText('¡Tu círculo arrancó!')).toBeTruthy();
+
+        await fireEvent.press(screen.getByRole('button', { name: 'Ver mi círculo' }));
+
+        // Ahora es la pantalla de siempre, con la rueda y su semana 1.
+        expect(await screen.findByText('Las del taller')).toBeTruthy();
+        expect(screen.getByText('5 personas · $500 cada semana')).toBeTruthy();
+        expect(screen.getByLabelText('Semana 1 de 5')).toBeTruthy();
+        expect(screen.getByText('Te toca en la semana 4')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Aportar mi cuota' })).toBeTruthy();
+        expect(screen.getByRole('tab', { name: 'Círculo' }).props.accessibilityState.selected).toBe(true);
+      });
+
+      it('al convertirse en "Mi círculo" deja de ser un círculo en formación', async () => {
+        await abrir(async () => null, undefined, undefined, undefined, null, [lleno()], undefined, enCurso());
+        await fireEvent.press(await screen.findByRole('button', { name: 'Ver mi círculo' }));
+        await screen.findByText('Las del taller');
+
+        expect(screen.queryByText('YA ARRANCÓ')).toBeNull();
+        expect(screen.queryByText('EN FORMACIÓN')).toBeNull();
+        expect(screen.queryByRole('button', { name: /Tu círculo Las del taller ya arrancó/ })).toBeNull();
+        expect(screen.queryByText('Aún no tienes un círculo')).toBeNull();
+      });
+
+      it('también en Grupo se ve el círculo recién arrancado, con su gente y sus turnos', async () => {
+        await abrir(async () => null, undefined, undefined, undefined, null, [lleno()], undefined, enCurso());
+        await fireEvent.press(await screen.findByRole('button', { name: 'Ver mi círculo' }));
+        await screen.findByText('Las del taller');
+
+        await fireEvent.press(pestana('Grupo'));
+
+        expect(screen.getByText('LOS 5 INTEGRANTES')).toBeTruthy();
+        expect(screen.getByLabelText('Tú, Turno 4, Pendiente')).toBeTruthy();
+        expect(screen.getByLabelText('Rosa Martínez, Turno 1, Pendiente')).toBeTruthy();
+      });
+
+      it('si ya está en otro círculo no lo reemplaza: avisa y sigue mostrando el que tenía', async () => {
+        await abrir(undefined, undefined, undefined, undefined, null, [lleno()], undefined, enCurso());
+        await screen.findByText('Los del mercado');
+        await fireEvent.press(await screen.findByRole('button', { name: /Tu círculo Las del taller ya arrancó/ }));
+        expect(await screen.findByText('¡Tu círculo arrancó!')).toBeTruthy();
+
+        expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
+        expect(screen.getByText(/Ya estás en otro círculo/)).toBeTruthy();
+
+        await fireEvent.press(screen.getByRole('button', { name: 'Entendido' }));
+
+        expect(screen.getByText('Los del mercado')).toBeTruthy();
+        expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
+        expect(screen.queryByText('Las del taller')).toBeNull();
+      });
+
+      it('mientras no arranca, la pantalla dice que está arrancando y no ofrece verlo', async () => {
+        await abrir(async () => null, undefined, undefined, undefined, null, [lleno()]);
+
+        expect(await screen.findByText('Tu círculo está arrancando…')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Ver mi círculo' })).toBeNull();
+      });
+    });
+
     it('el botón de atrás de Android cierra el círculo en formación', async () => {
       let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
       const espia = jest
@@ -644,6 +728,7 @@ describe('PrincipalScreen', () => {
         crearCirculo: jest.fn(),
         obtenerCirculosEnFormacion: jest.fn(async () => []),
         obtenerEnFormacion: jest.fn(),
+        obtenerArranque: jest.fn(),
       };
       await render(
         <PrincipalScreen

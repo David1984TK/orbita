@@ -274,6 +274,27 @@ describe('InicioScreen', () => {
       expect(screen.getByLabelText('Estás formando Segundo. Falta 1 persona.')).toBeTruthy();
     });
 
+    it('un círculo que ya se llenó se avisa como "ya arrancó", no como "formando"', async () => {
+      await abrirConFormacion([
+        formacionDeEjemplo({
+          id: 'lleno',
+          nombre: 'Las del taller',
+          integrantes: 5,
+          participantes: [
+            { id: 'yo', nombre: 'David Nava' },
+            { id: 'a', nombre: 'Rosa Martínez' },
+            { id: 'b', nombre: 'Julio Lara' },
+            { id: 'c', nombre: 'Ana Torres' },
+            { id: 'd', nombre: 'Carmen Ruiz' },
+          ],
+        }),
+      ]);
+
+      expect(screen.getByLabelText('Tu círculo Las del taller ya arrancó.')).toBeTruthy();
+      expect(screen.queryByText(/Estás formando/)).toBeNull();
+      expect(screen.getByText(/«Las del taller»\s*ya arrancó/)).toBeTruthy();
+    });
+
     it('con un solo aviso es una tarjeta que se toca directo', async () => {
       const { onVerFormacion } = await abrirConFormacion([formacionDeEjemplo({ id: 'uno' })]);
 

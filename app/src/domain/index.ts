@@ -86,6 +86,7 @@ export {
 } from './nuevoCirculo';
 export type { BorradorDeCirculo, ErroresDelBorrador, ResumenDelBorrador } from './nuevoCirculo';
 export {
+  arrancarCirculo,
   estaLleno,
   faltanPorEntrar,
   lugaresDelCirculo,
