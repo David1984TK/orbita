@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme';
 
@@ -16,7 +16,19 @@ export type Aviso = {
 
 type Props = {
   avisos: Aviso[];
+  /** Cuánto dura la pila a la vista antes de quitarse sola, en milisegundos. */
+  duracionMs?: number;
+  /**
+   * Los avisos que ya tuvieron su tiempo a la vista. Esos no vuelven a salir
+   * solos (aunque la pantalla se cierre y se abra); solo queda el distintivo.
+   */
+  mostrados?: string[];
+  /** La pila terminó su tiempo (o la persona tocó un aviso): estos ya se mostraron. */
+  onMostrados?: (ids: string[]) => void;
 };
+
+// Seis segundos a la vista.
+const DURACION_POR_DEFECTO = 6000;
 
 // Cuánto se asoma cada tarjeta que va detrás, y cuánto se encoge a cada lado.
 const ASOMO = 10;
@@ -50,15 +62,76 @@ function Tarjeta({ aviso }: { aviso: Aviso }) {
  * abre para ver todas las tarjetas; tocar una la abre, y tocar afuera o "Mostrar
  * menos" la vuelve a cerrar.
  *
+ * Los avisos duran 6 segundos a la vista y se quitan solos. Como son pendientes
+ * reales (alguien espera una respuesta), cuando se quitan queda un distintivo
+ * ("2 avisos") que los vuelve a sacar por otros 6 segundos. Mientras la pila está
+ * abierta no se quita, para no quitársela a quien la está leyendo. Si llega un
+ * aviso nuevo, la pila vuelve a salir.
+ *
  * Hay que ponerla dentro de un contenedor con `position: relative` (cualquier
  * vista, el contenido de un ScrollView o una pantalla): se pega a su borde de
  * arriba.
  */
-export function PilaDeAvisos({ avisos }: Props) {
+export function PilaDeAvisos({
+  avisos,
+  duracionMs = DURACION_POR_DEFECTO,
+  mostrados = [],
+  onMostrados,
+}: Props) {
   const [abierta, setAbierta] = useState(false);
+  const ids = avisos.map((aviso) => aviso.id);
+  // Los avisos se reconocen por su identificador: que cambie el texto de uno (por
+  // ejemplo, "Faltan 7" por "Faltan 6") no cuenta como un aviso nuevo.
+  const firma = ids.join('|');
+  const hayNuevos = avisos.some((aviso) => !mostrados.includes(aviso.id));
+  const [visible, setVisible] = useState(hayNuevos);
+  const desplegada = abierta && avisos.length >= 2;
+
+  // Se guarda la última función para que el temporizador no se reinicie si el
+  // padre pasa una nueva en cada dibujo.
+  const alMostrar = useRef(onMostrados);
+  alMostrar.current = onMostrados;
+
+  // Si llega un aviso que todavía no se había mostrado, la pila vuelve a salir.
+  useEffect(() => {
+    if (hayNuevos) {
+      setVisible(true);
+    }
+  }, [hayNuevos, firma]);
+
+  // La pila se quita sola. Mientras está abierta, no.
+  useEffect(() => {
+    if (!visible || desplegada || avisos.length === 0) {
+      return undefined;
+    }
+    const id = setTimeout(() => {
+      setVisible(false);
+      alMostrar.current?.(ids);
+    }, duracionMs);
+    return () => clearTimeout(id);
+    // `ids` cambia de identidad en cada dibujo; `firma` es lo que importa.
+  }, [visible, desplegada, firma, duracionMs]);
 
   if (avisos.length === 0) {
     return null;
+  }
+
+  // Ya tuvo su tiempo: queda solo el distintivo, para volver a verlos.
+  if (!visible) {
+    const cuantos = avisos.length === 1 ? '1 aviso' : `${avisos.length} avisos`;
+    return (
+      <View style={estilos.distintivoRaiz} pointerEvents="box-none">
+        <Pressable
+          onPress={() => setVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver ${cuantos}`}
+          hitSlop={8}
+          style={estilos.distintivo}
+        >
+          <Text style={estilos.distintivoTexto}>{cuantos}</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   if (avisos.length === 1) {
@@ -66,7 +139,10 @@ export function PilaDeAvisos({ avisos }: Props) {
     return (
       <View style={estilos.raiz} pointerEvents="box-none">
         <Pressable
-          onPress={unico.onPress}
+          onPress={() => {
+            onMostrados?.(ids);
+            unico.onPress();
+          }}
           accessibilityRole="button"
           accessibilityLabel={unico.etiqueta}
           style={({ pressed }) => pressed && estilos.presionada}
@@ -79,7 +155,7 @@ export function PilaDeAvisos({ avisos }: Props) {
 
   const capas = Math.min(avisos.length, MAX_CAPAS);
 
-  if (!abierta) {
+  if (!desplegada) {
     return (
       <View style={estilos.raiz} pointerEvents="box-none">
         <Pressable
@@ -139,6 +215,7 @@ export function PilaDeAvisos({ avisos }: Props) {
               key={aviso.id}
               onPress={() => {
                 setAbierta(false);
+                onMostrados?.(ids);
                 aviso.onPress();
               }}
               accessibilityRole="button"
@@ -171,6 +248,26 @@ const estilos = StyleSheet.create({
     right: 20,
     zIndex: 20,
     elevation: 20,
+  },
+  // El distintivo se pega arriba a la derecha, donde no estorba al título.
+  distintivoRaiz: {
+    position: 'absolute',
+    top: 8,
+    right: 20,
+    zIndex: 20,
+    elevation: 20,
+  },
+  distintivo: {
+    borderRadius: 12,
+    backgroundColor: colors.avisoSolido,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    ...SOMBRA,
+  },
+  distintivoTexto: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.cobalto,
   },
   fondo: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { Aviso } from './PilaDeAvisos';
 import { PilaDeAvisos } from './PilaDeAvisos';
 
@@ -178,6 +178,155 @@ describe('PilaDeAvisos', () => {
       for (const nombre of ['Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco']) {
         expect(screen.getByText(new RegExp(nombre))).toBeTruthy();
       }
+    });
+  });
+
+  describe('duran 6 segundos', () => {
+    const DURACION = 6000;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function pasar(ms: number) {
+      await act(async () => {
+        jest.advanceTimersByTime(ms);
+      });
+    }
+
+    it('por defecto duran 6 segundos: a los 5 todavía están y a los 6 ya no', async () => {
+      await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} />);
+
+      await pasar(DURACION - 1);
+      expect(screen.getByText(/Uno/)).toBeTruthy();
+
+      await pasar(1);
+      expect(screen.queryByText(/Uno/)).toBeNull();
+    });
+
+    it('al quitarse avisa cuáles ya se mostraron', async () => {
+      const onMostrados = jest.fn();
+      await render(
+        <PilaDeAvisos avisos={[aviso('a', 'Uno'), aviso('b', 'Dos')]} onMostrados={onMostrados} />,
+      );
+      expect(onMostrados).not.toHaveBeenCalled();
+
+      await pasar(DURACION);
+
+      expect(onMostrados).toHaveBeenCalledTimes(1);
+      expect(onMostrados).toHaveBeenCalledWith(['a', 'b']);
+    });
+
+    it('al quitarse queda un distintivo con cuántos avisos hay, en singular y plural', async () => {
+      const { rerender } = await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} />);
+      await pasar(DURACION);
+      expect(screen.getByText('1 aviso')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Ver 1 aviso' })).toBeTruthy();
+
+      await rerender(<PilaDeAvisos avisos={[aviso('a', 'Uno'), aviso('b', 'Dos')]} mostrados={['a', 'b']} />);
+      await pasar(DURACION);
+      expect(screen.getByText('2 avisos')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Ver 2 avisos' })).toBeTruthy();
+    });
+
+    it('el distintivo los vuelve a sacar y se quitan otra vez a los 6 segundos', async () => {
+      await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} />);
+      await pasar(DURACION);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Ver 1 aviso' }));
+      expect(screen.getByText(/Uno/)).toBeTruthy();
+      expect(screen.queryByText('1 aviso')).toBeNull();
+
+      await pasar(DURACION);
+      expect(screen.queryByText(/Uno/)).toBeNull();
+      expect(screen.getByText('1 aviso')).toBeTruthy();
+    });
+
+    it('la duración se puede cambiar', async () => {
+      await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} duracionMs={1000} />);
+
+      await pasar(999);
+      expect(screen.getByText(/Uno/)).toBeTruthy();
+      await pasar(1);
+      expect(screen.queryByText(/Uno/)).toBeNull();
+    });
+
+    it('si el aviso ya se había mostrado, no sale solo: solo el distintivo', async () => {
+      await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} mostrados={['a']} />);
+
+      expect(screen.queryByText(/Uno/)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Ver 1 aviso' })).toBeTruthy();
+    });
+
+    it('si llega un aviso nuevo, la pila vuelve a salir aunque estuviera quitada', async () => {
+      const { rerender } = await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} mostrados={['a']} />);
+      expect(screen.queryByText(/Uno/)).toBeNull();
+
+      await rerender(
+        <PilaDeAvisos avisos={[aviso('a', 'Uno'), aviso('b', 'Dos')]} mostrados={['a']} />,
+      );
+
+      expect(screen.getByText(/Uno/)).toBeTruthy();
+      expect(screen.getByRole('button', { name: '2 avisos. Toca para ver todos.' })).toBeTruthy();
+    });
+
+    it('que cambie el texto de un aviso no reinicia sus 6 segundos', async () => {
+      const { rerender } = await render(<PilaDeAvisos avisos={[aviso('a', 'Uno')]} />);
+      await pasar(3000);
+
+      await rerender(
+        <PilaDeAvisos avisos={[aviso('a', 'Uno', { despues: ' · Faltan 2 personas' })]} />,
+      );
+      await pasar(3000);
+
+      expect(screen.queryByText(/Uno/)).toBeNull();
+    });
+
+    it('mientras la pila está abierta no se quita, y al cerrarla vuelve a contar 6 segundos', async () => {
+      await render(<PilaDeAvisos avisos={[aviso('a', 'Uno'), aviso('b', 'Dos')]} />);
+      await fireEvent.press(screen.getByRole('button', { name: '2 avisos. Toca para ver todos.' }));
+
+      await pasar(DURACION * 3);
+      expect(screen.getByText(/Dos/)).toBeTruthy();
+
+      await fireEvent.press(screen.getByText('Mostrar menos'));
+      await pasar(DURACION - 1);
+      expect(screen.getByText(/Uno/)).toBeTruthy();
+      await pasar(1);
+      expect(screen.queryByText(/Uno/)).toBeNull();
+    });
+
+    it('tocar un aviso lo abre y cuenta como mostrado', async () => {
+      const uno = aviso('a', 'Uno');
+      const onMostrados = jest.fn();
+      await render(<PilaDeAvisos avisos={[uno]} onMostrados={onMostrados} />);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aviso Uno' }));
+
+      expect(uno.onPress).toHaveBeenCalledTimes(1);
+      expect(onMostrados).toHaveBeenCalledWith(['a']);
+    });
+
+    it('tocar un aviso de la pila abierta también cuenta como mostrado', async () => {
+      const onMostrados = jest.fn();
+      await render(
+        <PilaDeAvisos avisos={[aviso('a', 'Uno'), aviso('b', 'Dos')]} onMostrados={onMostrados} />,
+      );
+      await fireEvent.press(screen.getByRole('button', { name: '2 avisos. Toca para ver todos.' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aviso Dos' }));
+
+      expect(onMostrados).toHaveBeenCalledWith(['a', 'b']);
+    });
+
+    it('si no hay avisos no hay ni pila ni distintivo', async () => {
+      await render(<PilaDeAvisos avisos={[]} />);
+      await pasar(DURACION);
+
+      expect(screen.toJSON()).toBeNull();
     });
   });
 });

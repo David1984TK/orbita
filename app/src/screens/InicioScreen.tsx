@@ -37,6 +37,10 @@ type Props = {
   enFormacion?: CirculoEnFormacion[];
   /** La persona quiere ver cómo va uno de esos círculos. */
   onVerFormacion?: (id: string) => void;
+  /** Los avisos que ya tuvieron sus segundos a la vista y no deben volver a salir solos. */
+  avisosMostrados?: string[];
+  /** Estos avisos ya se mostraron: para que no vuelvan a salir al volver a esta pantalla. */
+  onAvisosMostrados?: (ids: string[]) => void;
 };
 
 function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
@@ -75,6 +79,8 @@ export function InicioScreen({
   onVerSolicitud,
   enFormacion = [],
   onVerFormacion,
+  avisosMostrados = [],
+  onAvisosMostrados,
 }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
@@ -227,7 +233,11 @@ export function InicioScreen({
         {/* Los avisos flotan encima de toda la pantalla, en pila, sin empujar nada hacia
             abajo: pueden tapar el nombre del círculo. Si la notificación se pasó, aquí
             siguen. Van al final para quedar por encima de todo. */}
-        <PilaDeAvisos avisos={avisos} />
+        <PilaDeAvisos
+          avisos={avisos}
+          mostrados={avisosMostrados}
+          onMostrados={onAvisosMostrados}
+        />
       </View>
     </SafeAreaView>
   );

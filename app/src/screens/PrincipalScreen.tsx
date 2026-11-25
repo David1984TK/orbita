@@ -80,6 +80,10 @@ export function PrincipalScreen({
   // viendo en este momento.
   const [enFormacion, setEnFormacion] = useState<CirculoEnFormacion[]>([]);
   const [formandoId, setFormandoId] = useState<string | null>(null);
+  // Los avisos que ya tuvieron sus segundos a la vista en "Mi círculo". Se guardan
+  // aquí y no en esa pantalla porque se desmonta al cambiar de pestaña, y los
+  // avisos no deben volver a salir cada vez que la persona regresa.
+  const [avisosMostrados, setAvisosMostrados] = useState<string[]>([]);
 
   const cargar = useCallback(() => {
     let cancelado = false;
@@ -315,6 +319,10 @@ export function PrincipalScreen({
             onRetirar={() => setVista('retirar')}
             solicitud={solicitud}
             onVerSolicitud={() => setVista('solicitud')}
+            avisosMostrados={avisosMostrados}
+            onAvisosMostrados={(ids) =>
+              setAvisosMostrados((antes) => [...antes, ...ids.filter((id) => !antes.includes(id))])
+            }
             enFormacion={enFormacion}
             onVerFormacion={(id) => {
               setFormandoId(id);

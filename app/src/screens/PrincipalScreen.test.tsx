@@ -606,6 +606,8 @@ describe('PrincipalScreen', () => {
         expect(screen.getByText('Faltan 6 personas')).toBeTruthy();
 
         await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+        // Al regresar el aviso ya tuvo su tiempo: queda el distintivo para verlo.
+        await fireEvent.press(screen.getByRole('button', { name: 'Ver 1 aviso' }));
 
         expect(aviso().props.accessibilityLabel).toBe('Estás formando Los del mercado. Faltan 6 personas.');
       } finally {
@@ -751,8 +753,83 @@ describe('PrincipalScreen', () => {
 
       expect(await screen.findByText('Los del mercado')).toBeTruthy();
       expect(recuperacion.responderSolicitud).not.toHaveBeenCalled();
+      // La solicitud sigue pendiente: tras su tiempo queda el distintivo para verla.
+      await fireEvent.press(screen.getByRole('button', { name: 'Ver 1 aviso' }));
       expect(verSolicitud()).toBeTruthy();
       espia.mockRestore();
+    });
+  });
+
+  describe('los avisos duran 6 segundos', () => {
+    const textoDelAviso = /perdió su teléfono y\s+pide volver a entrar/;
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('salen al abrir Mi círculo y se quitan a los 6 segundos, dejando el distintivo', async () => {
+      jest.useFakeTimers();
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      expect(screen.getByText(textoDelAviso)).toBeTruthy();
+
+      await act(async () => {
+        jest.advanceTimersByTime(5900);
+      });
+      expect(screen.getByText(textoDelAviso)).toBeTruthy();
+
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(screen.queryByText(textoDelAviso)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Ver 1 aviso' })).toBeTruthy();
+    });
+
+    it('al cambiar de pestaña y regresar no vuelven a salir solos', async () => {
+      jest.useFakeTimers();
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await act(async () => {
+        jest.advanceTimersByTime(6100);
+      });
+      expect(screen.queryByText(textoDelAviso)).toBeNull();
+
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(pestana('Círculo'));
+
+      expect(screen.queryByText(textoDelAviso)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Ver 1 aviso' })).toBeTruthy();
+    });
+
+    it('si se cambia de pestaña antes de que pasen los 6 segundos, al regresar todavía salen', async () => {
+      jest.useFakeTimers();
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(pestana('Círculo'));
+
+      expect(screen.getByText(textoDelAviso)).toBeTruthy();
+    });
+
+    it('el distintivo los vuelve a sacar por otros 6 segundos', async () => {
+      jest.useFakeTimers();
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await act(async () => {
+        jest.advanceTimersByTime(6100);
+      });
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Ver 1 aviso' }));
+      expect(screen.getByText(textoDelAviso)).toBeTruthy();
+
+      await act(async () => {
+        jest.advanceTimersByTime(6100);
+      });
+      expect(screen.queryByText(textoDelAviso)).toBeNull();
     });
   });
 });
