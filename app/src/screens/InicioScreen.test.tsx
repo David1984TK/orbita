@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { EstadoPago, MiCirculo } from '../domain';
-import { circuloDeEjemplo } from '../servicios/circulos';
+import { circuloDeEjemplo, formacionDeEjemplo } from '../servicios/circulos';
 import { InicioScreen } from './InicioScreen';
 
 jest.mock('react-native-safe-area-context', () =>
@@ -223,6 +223,60 @@ describe('InicioScreen', () => {
 
       expect(screen.queryByRole('button', { name: 'Retirar mi dinero' })).toBeNull();
       expect(screen.queryByText(/Por seguridad podrás retirar/)).toBeNull();
+    });
+  });
+
+  describe('círculos que se están llenando', () => {
+    async function abrirConFormacion(formando = [formacionDeEjemplo()]) {
+      const onVerFormacion = jest.fn();
+      await render(
+        <InicioScreen
+          miCirculo={miCirculo()}
+          onAportar={jest.fn()}
+          onRetirar={jest.fn()}
+          enFormacion={formando}
+          onVerFormacion={onVerFormacion}
+        />,
+      );
+      return { onVerFormacion };
+    }
+
+    it('sin círculos en formación no hay aviso', async () => {
+      await abrir();
+
+      expect(screen.queryByText(/Estás formando/)).toBeNull();
+    });
+
+    it('avisa de cada círculo que se llena y cuánto falta', async () => {
+      await abrirConFormacion([
+        formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
+        formacionDeEjemplo({
+          id: 'dos',
+          nombre: 'Segundo',
+          integrantes: 5,
+          participantes: [
+            { id: 'yo', nombre: 'David Nava' },
+            { id: 'a', nombre: 'Rosa Martínez' },
+            { id: 'b', nombre: 'Julio Lara' },
+            { id: 'c', nombre: 'Ana Torres' },
+          ],
+        }),
+      ]);
+
+      expect(screen.getByLabelText('Estás formando Primero. Faltan 9 personas.')).toBeTruthy();
+      expect(screen.getByLabelText('Estás formando Segundo. Falta 1 persona.')).toBeTruthy();
+    });
+
+    it('al tocar un aviso dice cuál círculo se quiere ver', async () => {
+      const { onVerFormacion } = await abrirConFormacion([
+        formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
+        formacionDeEjemplo({ id: 'dos', nombre: 'Segundo' }),
+      ]);
+
+      await fireEvent.press(screen.getByLabelText(/Estás formando Segundo/));
+
+      expect(onVerFormacion).toHaveBeenCalledTimes(1);
+      expect(onVerFormacion).toHaveBeenCalledWith('dos');
     });
   });
 });

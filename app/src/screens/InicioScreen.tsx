@@ -13,8 +13,9 @@ import {
   resumenDeMiTurno,
   retiroEnEspera,
   segmentosDeLaRueda,
+  textoDeFaltantesDelCirculo,
 } from '../domain';
-import type { MiCirculo, ResumenDeMiTurno } from '../domain';
+import type { CirculoEnFormacion, MiCirculo, ResumenDeMiTurno } from '../domain';
 import type { SolicitudDeRecuperacion } from '../servicios/recuperacion';
 import { colors } from '../theme';
 
@@ -30,6 +31,10 @@ type Props = {
   solicitud?: SolicitudDeRecuperacion | null;
   /** La persona quiere ver la solicitud para responderla. */
   onVerSolicitud?: () => void;
+  /** Círculos que la persona creó y todavía se están llenando. */
+  enFormacion?: CirculoEnFormacion[];
+  /** La persona quiere ver cómo va uno de esos círculos. */
+  onVerFormacion?: (id: string) => void;
 };
 
 function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
@@ -66,6 +71,8 @@ export function InicioScreen({
   ahora = new Date(),
   solicitud = null,
   onVerSolicitud,
+  enFormacion = [],
+  onVerFormacion,
 }: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
@@ -96,6 +103,24 @@ export function InicioScreen({
             <Text style={estilos.solicitudFlecha}>›</Text>
           </Pressable>
         )}
+
+        {enFormacion.map((formando) => (
+          // Un círculo que se está llenando: aquí se ve cuánto falta sin tener que
+          // buscarlo.
+          <Pressable
+            key={formando.id}
+            onPress={() => onVerFormacion?.(formando.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Estás formando ${formando.nombre}. ${textoDeFaltantesDelCirculo(formando)}.`}
+            style={({ pressed }) => [estilos.solicitud, pressed && estilos.botonPresionado]}
+          >
+            <Text style={estilos.solicitudTexto}>
+              Estás formando <Text style={estilos.solicitudNegrita}>«{formando.nombre}»</Text> ·{' '}
+              {textoDeFaltantesDelCirculo(formando)}
+            </Text>
+            <Text style={estilos.solicitudFlecha}>›</Text>
+          </Pressable>
+        ))}
 
         <View style={estilos.encabezado}>
           <Text style={estilos.titulo} accessibilityRole="header">

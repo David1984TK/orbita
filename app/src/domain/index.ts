@@ -85,6 +85,14 @@ export {
   validarBorrador,
 } from './nuevoCirculo';
 export type { BorradorDeCirculo, ErroresDelBorrador, ResumenDelBorrador } from './nuevoCirculo';
+export {
+  estaLleno,
+  faltanPorEntrar,
+  lugaresDelCirculo,
+  mensajeDeInvitacion,
+  textoDeFaltantes as textoDeFaltantesDelCirculo,
+} from './formacion';
+export type { CirculoEnFormacion, Lugar, Participante } from './formacion';
 export { fraccionDelPuntaje } from './historial';
 export type { Historial, Nivel } from './historial';
 export type { Circulo, Integrante, EstadoPago, Moneda, MiCirculo } from './circulo';

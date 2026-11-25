@@ -3,17 +3,18 @@ import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
-import { PantallaProvisional } from '../components/PantallaProvisional';
 import { ponerEsperaDeRetiro, registrarAporte, registrarRetiro } from '../domain';
-import type { BorradorDeCirculo, MiCirculo } from '../domain';
+import type { BorradorDeCirculo, CirculoEnFormacion, MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
+import type { Compartir } from '../servicios/compartir';
 import type { Historiales } from '../servicios/historial';
 import type { Recuperacion, RespuestaASolicitud, SolicitudDeRecuperacion } from '../servicios/recuperacion';
 import type { Retiros } from '../servicios/retiros';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
 import { ConfirmarIdentidadScreen } from './ConfirmarIdentidadScreen';
+import { FormandoScreen } from './FormandoScreen';
 import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
 import { NuevoCirculoScreen } from './NuevoCirculoScreen';
@@ -27,6 +28,8 @@ type Props = {
   retiros: Retiros;
   historiales: Historiales;
   recuperacion: Recuperacion;
+  /** Abre el cuadro de compartir, para mandar la invitación a un círculo en formación. */
+  compartir: Compartir;
   /**
    * Si la persona acaba de recuperar su acceso: hasta cuándo no puede retirar
    * dinero (fecha y hora ISO). Se aplica al círculo al cargarlo, mientras el
@@ -38,10 +41,10 @@ type Props = {
 /**
  * La pantalla de la pestaña o uno de los pasos cortos que se abren encima:
  * aportar, retirar y responder a una solicitud de recuperación (desde "Círculo")
- * y crear un círculo (desde la pantalla vacía o desde "Grupo"). "invitar" es el
- * paso que sigue a crear: todavía no existe.
+ * y crear un círculo (desde la pantalla vacía o desde "Grupo"). "formando" es el
+ * círculo recién creado, que todavía se está llenando.
  */
-type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'invitar' | 'solicitud';
+type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'formando' | 'solicitud';
 
 type Carga =
   | { tipo: 'cargando' }
@@ -66,13 +69,17 @@ export function PrincipalScreen({
   retiros,
   historiales,
   recuperacion,
+  compartir,
   retiroCongeladoHasta,
 }: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [vista, setVista] = useState<Vista>('inicio');
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
-  const [creado, setCreado] = useState('');
   const [solicitud, setSolicitud] = useState<SolicitudDeRecuperacion | null>(null);
+  // Los círculos que la persona creó y todavía se están llenando, y cuál está
+  // viendo en este momento.
+  const [enFormacion, setEnFormacion] = useState<CirculoEnFormacion[]>([]);
+  const [formandoId, setFormandoId] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
     let cancelado = false;
@@ -123,6 +130,23 @@ export function PrincipalScreen({
     };
   }, [recuperacion]);
 
+  // Los círculos que se están llenando. Si no se pueden consultar, simplemente no
+  // se muestran: no es un error que le toque resolver a la persona.
+  useEffect(() => {
+    let cancelado = false;
+    circulos
+      .obtenerCirculosEnFormacion()
+      .then((lista) => {
+        if (!cancelado) {
+          setEnFormacion(lista);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [circulos]);
+
   // En Android el botón de atrás cierra el paso corto en vez de salirse de la app.
   useEffect(() => {
     if (vista === 'inicio') {
@@ -138,10 +162,18 @@ export function PrincipalScreen({
   // "Círculo" y "Grupo" se alimentan del mismo círculo.
   const necesitaCirculo = pestana === 'circulo' || pestana === 'grupo';
 
-  // Crear e invitar se pueden abrir desde "Círculo" o "Grupo". Aportar y retirar
-  // solo desde "Círculo" y con el círculo ya cargado.
+  // El círculo en formación que se está viendo, si existe.
+  const viendoFormacion = enFormacion.find((c) => c.id === formandoId) ?? null;
+  // Sin un círculo en curso, la pantalla de "Círculo" y "Grupo" es el círculo que
+  // se está llenando (el más reciente), si hay alguno.
+  const formacionPrincipal =
+    carga.tipo === 'sinCirculo' && enFormacion.length > 0 ? enFormacion[enFormacion.length - 1] : null;
+
+  // Crear se puede abrir desde "Círculo" o "Grupo". Ver cómo va un círculo que se
+  // llena, también. Aportar, retirar y responder una solicitud, solo desde
+  // "Círculo" y con el círculo ya cargado.
   const paso: Vista =
-    vista === 'crear' || vista === 'invitar'
+    vista === 'crear' || (vista === 'formando' && viendoFormacion !== null)
       ? vista
       : (vista === 'aportar' || vista === 'retirar' || vista === 'solicitud') &&
           pestana === 'circulo' &&
@@ -149,6 +181,10 @@ export function PrincipalScreen({
         ? vista
         : 'inicio';
   const enPasoAparte = paso !== 'inicio';
+
+  function actualizarFormacion(actualizado: CirculoEnFormacion) {
+    setEnFormacion((lista) => lista.map((c) => (c.id === actualizado.id ? actualizado : c)));
+  }
 
   async function confirmarAporte(total: number) {
     if (carga.tipo !== 'listo') {
@@ -179,8 +215,11 @@ export function PrincipalScreen({
   async function confirmarCreacion(borrador: BorradorDeCirculo) {
     const resultado = await circulos.crearCirculo(borrador);
     if (resultado.ok) {
-      setCreado(borrador.nombre);
-      setVista('invitar');
+      setEnFormacion((lista) => [...lista, resultado.enFormacion]);
+      setFormandoId(resultado.enFormacion.id);
+      // Con un círculo en curso se abre aparte, con "Volver"; sin él, el círculo
+      // que se llena pasa a ser la pantalla principal.
+      setVista(carga.tipo === 'listo' ? 'formando' : 'inicio');
     }
     return resultado;
   }
@@ -206,12 +245,13 @@ export function PrincipalScreen({
           <NuevoCirculoScreen onCrear={confirmarCreacion} onVolver={() => setVista('inicio')} />
         )}
 
-        {paso === 'invitar' && (
-          // Provisional: invitar por WhatsApp necesita el servidor (Etapa 3), y un
-          // círculo recién creado todavía no tiene dónde mostrarse (falta el
-          // estado "formando el círculo").
-          <PantallaProvisional
-            texto={`Tu círculo «${creado}» se creó (simulado). Aquí va la invitación por WhatsApp. Todavía no existe.`}
+        {paso === 'formando' && viendoFormacion !== null && (
+          <FormandoScreen
+            key={viendoFormacion.id}
+            circulo={viendoFormacion}
+            obtener={() => circulos.obtenerEnFormacion(viendoFormacion.id)}
+            onActualizado={actualizarFormacion}
+            onCompartir={(mensaje) => compartir.compartir(mensaje)}
             onVolver={() => setVista('inicio')}
           />
         )}
@@ -254,8 +294,18 @@ export function PrincipalScreen({
           </SafeAreaView>
         )}
 
-        {necesitaCirculo && !enPasoAparte && carga.tipo === 'sinCirculo' && (
+        {necesitaCirculo && !enPasoAparte && carga.tipo === 'sinCirculo' && formacionPrincipal === null && (
           <SinCirculoScreen onCrear={() => setVista('crear')} />
+        )}
+
+        {necesitaCirculo && !enPasoAparte && formacionPrincipal !== null && (
+          <FormandoScreen
+            key={formacionPrincipal.id}
+            circulo={formacionPrincipal}
+            obtener={() => circulos.obtenerEnFormacion(formacionPrincipal.id)}
+            onActualizado={actualizarFormacion}
+            onCompartir={(mensaje) => compartir.compartir(mensaje)}
+          />
         )}
 
         {pestana === 'circulo' && !enPasoAparte && carga.tipo === 'listo' && (
@@ -265,6 +315,11 @@ export function PrincipalScreen({
             onRetirar={() => setVista('retirar')}
             solicitud={solicitud}
             onVerSolicitud={() => setVista('solicitud')}
+            enFormacion={enFormacion}
+            onVerFormacion={(id) => {
+              setFormandoId(id);
+              setVista('formando');
+            }}
           />
         )}
 

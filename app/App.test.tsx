@@ -138,4 +138,25 @@ describe('App: entrada', () => {
       expect(await screen.findByText('Los del mercado')).toBeTruthy();
     });
   });
+
+  it('crear un círculo lleva a verlo llenarse, con el enlace para invitar', async () => {
+    await render(<App />);
+    await escribirTelefonoYContinuar();
+    await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
+    await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+    await fireEvent.press(await screen.findByRole('button', { name: /Activar/ }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Tomar foto de mi INE' }));
+    await screen.findByText('Los del mercado');
+    await fireEvent.press(screen.getByRole('tab', { name: 'Grupo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+
+    await fireEvent.changeText(screen.getByLabelText('Nombre del círculo'), 'Las del taller');
+    await fireEvent.changeText(screen.getByLabelText('Cuota semanal'), '500');
+    await fireEvent.press(screen.getByRole('button', { name: 'Crear e invitar' }));
+
+    expect(await screen.findByText('EN FORMACIÓN')).toBeTruthy();
+    expect(screen.getByText('Las del taller')).toBeTruthy();
+    expect(screen.getByText('https://orbita.example/c/las-del-taller-1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Compartir por WhatsApp' })).toBeTruthy();
+  });
 });

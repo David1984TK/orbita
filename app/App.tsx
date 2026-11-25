@@ -8,6 +8,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { PrincipalScreen } from './src/screens/PrincipalScreen';
 import { RecuperarFlow } from './src/screens/RecuperarFlow';
 import { crearAportes } from './src/servicios/aportes';
+import { crearCompartir } from './src/servicios/compartir';
 import { crearCirculos } from './src/servicios/circulos';
 import { crearHistoriales } from './src/servicios/historial';
 import { crearIdentidad } from './src/servicios/identidad';
@@ -35,6 +36,7 @@ export default function App() {
   const retiros = useMemo(() => crearRetiros(), []);
   const historiales = useMemo(() => crearHistoriales(), []);
   const recuperacion = useMemo(() => crearRecuperacion(), []);
+  const compartir = useMemo(() => crearCompartir(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
   // Si la persona recuperó su acceso: hasta cuándo no puede retirar dinero.
   const [retiroCongeladoHasta, setRetiroCongeladoHasta] = useState<string | undefined>();
@@ -116,6 +118,7 @@ export default function App() {
           retiros={retiros}
           historiales={historiales}
           recuperacion={recuperacion}
+          compartir={compartir}
           retiroCongeladoHasta={retiroCongeladoHasta}
         />
       )}

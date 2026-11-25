@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { BorradorDeCirculo } from '../domain';
+import { formacionDeEjemplo } from '../servicios/circulos';
 import type { ResultadoDeCreacion } from '../servicios/circulos';
 import { NuevoCirculoScreen } from './NuevoCirculoScreen';
 
@@ -8,7 +9,10 @@ jest.mock('react-native-safe-area-context', () =>
 );
 
 async function abrir(onCrear?: (borrador: BorradorDeCirculo) => Promise<ResultadoDeCreacion>) {
-  const crear = jest.fn(onCrear ?? (async (): Promise<ResultadoDeCreacion> => ({ ok: true })));
+  const crear = jest.fn(
+    onCrear ??
+      (async (): Promise<ResultadoDeCreacion> => ({ ok: true, enFormacion: formacionDeEjemplo() })),
+  );
   const onVolver = jest.fn();
   await render(<NuevoCirculoScreen onCrear={crear} onVolver={onVolver} hoy="2026-11-24" />);
   return { crear, onVolver };
@@ -180,7 +184,7 @@ describe('NuevoCirculoScreen', () => {
 
     expect(crear).toHaveBeenCalledTimes(1);
 
-    await act(async () => terminar({ ok: true }));
+    await act(async () => terminar({ ok: true, enFormacion: formacionDeEjemplo() }));
     expect(screen.getByText('Crear e invitar')).toBeTruthy();
   });
 

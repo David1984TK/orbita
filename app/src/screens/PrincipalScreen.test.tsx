@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
 import type { MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
-import { circuloDeEjemplo } from '../servicios/circulos';
-import type { Circulos } from '../servicios/circulos';
+import type { CirculoEnFormacion } from '../domain';
+import { circuloDeEjemplo, formacionDeEjemplo } from '../servicios/circulos';
+import type { Circulos, ResultadoDeCreacion } from '../servicios/circulos';
+import type { Compartir, ResultadoDeCompartir } from '../servicios/compartir';
 import { historialDeEjemplo } from '../servicios/historial';
 import type { Historiales } from '../servicios/historial';
 import { solicitudDeEjemplo } from '../servicios/recuperacion';
@@ -53,13 +55,23 @@ async function abrir(
   obtener: () => Promise<MiCirculo | null> = async () => circuloDeEjemplo(),
   aportar: Aportes['aportar'] = async () => ({ ok: true }),
   retirar: Retiros['retirar'] = async () => ({ ok: true }),
-  crear: Circulos['crearCirculo'] = async () => ({ ok: true }),
+  crear: Circulos['crearCirculo'] = async (): Promise<ResultadoDeCreacion> => ({
+    ok: true,
+    enFormacion: formacionDeEjemplo(),
+  }),
   solicitud: SolicitudDeRecuperacion | null = null,
+  formando: CirculoEnFormacion[] = [],
+  alCompartir: (mensaje: string) => Promise<ResultadoDeCompartir> = async () => 'compartido',
 ) {
   const circulos: Circulos = {
     obtenerMiCirculo: jest.fn(obtener),
     crearCirculo: jest.fn(crear),
+    obtenerCirculosEnFormacion: jest.fn(async () => formando),
+    obtenerEnFormacion: jest.fn(
+      async (id: string) => formando.find((c) => c.id === id) ?? formacionDeEjemplo({ id }),
+    ),
   };
+  const compartir: Compartir = { compartir: jest.fn(alCompartir) };
   const aportes: Aportes = { aportar: jest.fn(aportar) };
   const retiros: Retiros = { retirar: jest.fn(retirar) };
   const historiales: Historiales = { obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) };
@@ -71,9 +83,10 @@ async function abrir(
       retiros={retiros}
       historiales={historiales}
       recuperacion={recuperacion}
+      compartir={compartir}
     />,
   );
-  return { circulos, aportes, retiros, historiales, recuperacion };
+  return { circulos, aportes, retiros, historiales, recuperacion, compartir };
 }
 
 const botonConfirmar = () => screen.getByRole('button', { name: /Confirmar con/ });
@@ -363,6 +376,12 @@ describe('PrincipalScreen', () => {
       await fireEvent.press(screen.getByRole('button', { name: 'Crear e invitar' }));
     };
 
+    const aGrupoYCrear = async () => {
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(pestana('Grupo'));
+      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+    };
+
     it('quien no está en ningún círculo ve una pantalla para crear el primero', async () => {
       await abrir(async () => null);
 
@@ -391,10 +410,7 @@ describe('PrincipalScreen', () => {
 
     it('desde la pestaña Grupo, "Crear otro círculo" abre "Nuevo círculo"', async () => {
       await abrir();
-      await screen.findByText('Los del mercado');
-      await fireEvent.press(pestana('Grupo'));
-
-      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await aGrupoYCrear();
 
       expect(screen.getByText('Nuevo círculo')).toBeTruthy();
       expect(screen.queryByRole('tab', { name: 'Grupo' })).toBeNull();
@@ -402,9 +418,7 @@ describe('PrincipalScreen', () => {
 
     it('"Volver" regresa a la pestaña de donde se vino, sin crear nada', async () => {
       const { circulos } = await abrir();
-      await screen.findByText('Los del mercado');
-      await fireEvent.press(pestana('Grupo'));
-      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await aGrupoYCrear();
 
       await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
 
@@ -413,11 +427,9 @@ describe('PrincipalScreen', () => {
       expect(circulos.crearCirculo).not.toHaveBeenCalled();
     });
 
-    it('al crear manda lo elegido y pasa a la invitación, que todavía no existe', async () => {
+    it('al crear manda lo elegido', async () => {
       const { circulos } = await abrir();
-      await screen.findByText('Los del mercado');
-      await fireEvent.press(pestana('Grupo'));
-      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await aGrupoYCrear();
 
       await llenarYCrear();
 
@@ -427,17 +439,25 @@ describe('PrincipalScreen', () => {
         cuota: 600,
         moneda: 'pesos',
       });
-      expect(await screen.findByText(/Tu círculo «Los del mercado» se creó/)).toBeTruthy();
-      expect(screen.getByText(/Aquí va la invitación por WhatsApp/)).toBeTruthy();
     });
 
-    it('desde la invitación se vuelve a la pestaña, con su barra', async () => {
+    it('con un círculo en curso, al crear abre el círculo en formación aparte, con "Volver"', async () => {
       await abrir();
-      await screen.findByText('Los del mercado');
-      await fireEvent.press(pestana('Grupo'));
-      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await aGrupoYCrear();
+
       await llenarYCrear();
-      await screen.findByText(/se creó/);
+
+      expect(await screen.findByText('EN FORMACIÓN')).toBeTruthy();
+      expect(screen.getByText('Faltan 9 personas')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Volver' })).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Grupo' })).toBeNull();
+    });
+
+    it('desde el círculo en formación "Volver" regresa a la pestaña, con su barra', async () => {
+      await abrir();
+      await aGrupoYCrear();
+      await llenarYCrear();
+      await screen.findByText('EN FORMACIÓN');
 
       await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
 
@@ -445,17 +465,27 @@ describe('PrincipalScreen', () => {
       expect(pestana('Grupo').props.accessibilityState.selected).toBe(true);
     });
 
+    it('sin ningún círculo en curso, el círculo recién creado pasa a ser la pantalla principal', async () => {
+      await abrir(async () => null);
+      await fireEvent.press(await screen.findByRole('button', { name: 'Crear un círculo' }));
+
+      await llenarYCrear();
+
+      expect(await screen.findByText('EN FORMACIÓN')).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Volver' })).toBeNull();
+      expect(screen.queryByText('Aún no tienes un círculo')).toBeNull();
+    });
+
     it('si la creación falla se queda en "Nuevo círculo" con lo escrito', async () => {
       await abrir(undefined, undefined, undefined, async () => ({ ok: false, motivo: 'error' }));
-      await screen.findByText('Los del mercado');
-      await fireEvent.press(pestana('Grupo'));
-      await fireEvent.press(screen.getByRole('button', { name: 'Crear otro círculo' }));
+      await aGrupoYCrear();
 
       await llenarYCrear();
 
       expect(await screen.findByText(/No pudimos crear tu círculo/)).toBeTruthy();
       expect(screen.getByLabelText('Nombre del círculo').props.value).toBe('Los del mercado');
-      expect(screen.queryByText(/se creó/)).toBeNull();
+      expect(screen.queryByText('EN FORMACIÓN')).toBeNull();
     });
 
     it('el botón de atrás de Android cierra "Nuevo círculo"', async () => {
@@ -480,11 +510,138 @@ describe('PrincipalScreen', () => {
     });
   });
 
+  describe('Círculo en formación', () => {
+    const aviso = () => screen.getByRole('button', { name: /Estás formando/ });
+
+    it('con un círculo en curso, "Mi círculo" avisa del que se está llenando y cuánto falta', async () => {
+      await abrir(undefined, undefined, undefined, undefined, null, [formacionDeEjemplo()]);
+
+      expect(await screen.findByText(/Faltan 9 personas/)).toBeTruthy();
+      expect(aviso().props.accessibilityLabel).toBe('Estás formando Los del mercado. Faltan 9 personas.');
+    });
+
+    it('sin círculos en formación no hay aviso', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+
+      expect(screen.queryByRole('button', { name: /Estás formando/ })).toBeNull();
+    });
+
+    it('al tocar el aviso abre el círculo en formación, y "Volver" regresa a Mi círculo', async () => {
+      await abrir(undefined, undefined, undefined, undefined, null, [formacionDeEjemplo()]);
+      await fireEvent.press(await screen.findByRole('button', { name: /Estás formando/ }));
+
+      expect(screen.getByText('EN FORMACIÓN')).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+      expect(screen.getByText('15 personas · $600 cada semana')).toBeTruthy();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+    });
+
+    it('sin círculo en curso pero con uno en formación, ese es el que se ve en Círculo y en Grupo', async () => {
+      await abrir(async () => null, undefined, undefined, undefined, null, [formacionDeEjemplo()]);
+
+      expect(await screen.findByText('EN FORMACIÓN')).toBeTruthy();
+      expect(screen.queryByText('Aún no tienes un círculo')).toBeNull();
+
+      await fireEvent.press(pestana('Grupo'));
+      expect(screen.getByText('EN FORMACIÓN')).toBeTruthy();
+    });
+
+    it('si hay varios en formación sin círculo en curso, se ve el más reciente', async () => {
+      await abrir(async () => null, undefined, undefined, undefined, null, [
+        formacionDeEjemplo({ id: 'uno', nombre: 'Primero' }),
+        formacionDeEjemplo({ id: 'dos', nombre: 'Segundo' }),
+      ]);
+
+      expect(await screen.findByText('Segundo')).toBeTruthy();
+      expect(screen.queryByText('Primero')).toBeNull();
+    });
+
+    it('"Compartir por WhatsApp" manda la invitación con el nombre y el enlace', async () => {
+      const { compartir } = await abrir(
+        async () => null,
+        undefined,
+        undefined,
+        undefined,
+        null,
+        [formacionDeEjemplo()],
+      );
+
+      await fireEvent.press(await screen.findByRole('button', { name: 'Compartir por WhatsApp' }));
+
+      expect(compartir.compartir).toHaveBeenCalledTimes(1);
+      const mensaje = (compartir.compartir as jest.Mock).mock.calls[0][0] as string;
+      expect(mensaje).toContain('«Los del mercado»');
+      expect(mensaje).toContain('https://orbita.example/c/los-del-mercado-nuevo');
+    });
+
+    it('lo que va entrando se refleja también en el aviso de Mi círculo', async () => {
+      jest.useFakeTimers();
+      try {
+        const { circulos } = await abrir(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          null,
+          [formacionDeEjemplo()],
+        );
+        (circulos.obtenerEnFormacion as jest.Mock).mockResolvedValue(
+          formacionDeEjemplo({
+            participantes: [
+              { id: 'yo', nombre: 'David Nava' },
+              { id: 'a', nombre: 'Rosa Martínez' },
+              { id: 'b', nombre: 'Julio Lara' },
+              { id: 'c', nombre: 'Ana Torres' },
+            ],
+          }),
+        );
+        await fireEvent.press(await screen.findByRole('button', { name: /Estás formando/ }));
+        await act(async () => {
+          jest.advanceTimersByTime(5000);
+        });
+        expect(screen.getByText('Faltan 6 personas')).toBeTruthy();
+
+        await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+
+        expect(aviso().props.accessibilityLabel).toBe('Estás formando Los del mercado. Faltan 6 personas.');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('el botón de atrás de Android cierra el círculo en formación', async () => {
+      let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
+      const espia = jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_evento, manejador) => {
+          atras = manejador;
+          return { remove: jest.fn() };
+        });
+      await abrir(undefined, undefined, undefined, undefined, null, [formacionDeEjemplo()]);
+      await fireEvent.press(await screen.findByRole('button', { name: /Estás formando/ }));
+      expect(screen.getByText('EN FORMACIÓN')).toBeTruthy();
+
+      await act(async () => {
+        expect(atras({} as never)).toBe(true);
+      });
+
+      expect(screen.queryByText('EN FORMACIÓN')).toBeNull();
+      expect(screen.getByText('Los del mercado')).toBeTruthy();
+      espia.mockRestore();
+    });
+  });
+
   describe('después de recuperar el acceso', () => {
     it('el retiro queda en espera hasta la fecha que llega de la recuperación', async () => {
       const circulos: Circulos = {
         obtenerMiCirculo: jest.fn(async () => enMiTurno()),
-        crearCirculo: jest.fn(async () => ({ ok: true }) as const),
+        crearCirculo: jest.fn(),
+        obtenerCirculosEnFormacion: jest.fn(async () => []),
+        obtenerEnFormacion: jest.fn(),
       };
       await render(
         <PrincipalScreen
@@ -493,6 +650,7 @@ describe('PrincipalScreen', () => {
           retiros={{ retirar: jest.fn(async () => ({ ok: true }) as const) }}
           historiales={{ obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) }}
           recuperacion={recuperacionCon(null)}
+          compartir={{ compartir: jest.fn(async () => 'compartido' as const) }}
           retiroCongeladoHasta={new Date(Date.now() + 72 * 3600 * 1000).toISOString()}
         />,
       );
