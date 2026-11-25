@@ -6,6 +6,8 @@ import { circuloDeEjemplo } from '../servicios/circulos';
 import type { Circulos } from '../servicios/circulos';
 import { historialDeEjemplo } from '../servicios/historial';
 import type { Historiales } from '../servicios/historial';
+import { solicitudDeEjemplo } from '../servicios/recuperacion';
+import type { Recuperacion, SolicitudDeRecuperacion } from '../servicios/recuperacion';
 import type { Retiros } from '../servicios/retiros';
 import { PrincipalScreen } from './PrincipalScreen';
 
@@ -32,11 +34,27 @@ function enMiTurno(): MiCirculo {
   };
 }
 
+// Una recuperación de mentira: lo único que importa aquí es la solicitud pendiente.
+function recuperacionCon(solicitud: SolicitudDeRecuperacion | null): Recuperacion {
+  let pendiente = solicitud;
+  return {
+    verificarSelfie: jest.fn(async () => ({ ok: true }) as const),
+    obtenerConfirmaciones: jest.fn(async () => ({ circuloNombre: '', personas: [] })),
+    avisarAlGrupo: jest.fn(async () => {}),
+    completar: jest.fn(),
+    obtenerSolicitudPendiente: jest.fn(async () => pendiente),
+    responderSolicitud: jest.fn(async () => {
+      pendiente = null;
+    }),
+  } as unknown as Recuperacion;
+}
+
 async function abrir(
   obtener: () => Promise<MiCirculo | null> = async () => circuloDeEjemplo(),
   aportar: Aportes['aportar'] = async () => ({ ok: true }),
   retirar: Retiros['retirar'] = async () => ({ ok: true }),
   crear: Circulos['crearCirculo'] = async () => ({ ok: true }),
+  solicitud: SolicitudDeRecuperacion | null = null,
 ) {
   const circulos: Circulos = {
     obtenerMiCirculo: jest.fn(obtener),
@@ -45,15 +63,17 @@ async function abrir(
   const aportes: Aportes = { aportar: jest.fn(aportar) };
   const retiros: Retiros = { retirar: jest.fn(retirar) };
   const historiales: Historiales = { obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) };
+  const recuperacion = recuperacionCon(solicitud);
   await render(
     <PrincipalScreen
       circulos={circulos}
       aportes={aportes}
       retiros={retiros}
       historiales={historiales}
+      recuperacion={recuperacion}
     />,
   );
-  return { circulos, aportes, retiros, historiales };
+  return { circulos, aportes, retiros, historiales, recuperacion };
 }
 
 const botonConfirmar = () => screen.getByRole('button', { name: /Confirmar con/ });
@@ -456,6 +476,124 @@ describe('PrincipalScreen', () => {
 
       expect(screen.queryByText('Nuevo círculo')).toBeNull();
       expect(screen.getByText('Aún no tienes un círculo')).toBeTruthy();
+      espia.mockRestore();
+    });
+  });
+
+  describe('después de recuperar el acceso', () => {
+    it('el retiro queda en espera hasta la fecha que llega de la recuperación', async () => {
+      const circulos: Circulos = {
+        obtenerMiCirculo: jest.fn(async () => enMiTurno()),
+        crearCirculo: jest.fn(async () => ({ ok: true }) as const),
+      };
+      await render(
+        <PrincipalScreen
+          circulos={circulos}
+          aportes={{ aportar: jest.fn(async () => ({ ok: true }) as const) }}
+          retiros={{ retirar: jest.fn(async () => ({ ok: true }) as const) }}
+          historiales={{ obtenerMiHistorial: jest.fn(async () => historialDeEjemplo()) }}
+          recuperacion={recuperacionCon(null)}
+          retiroCongeladoHasta={new Date(Date.now() + 72 * 3600 * 1000).toISOString()}
+        />,
+      );
+
+      const boton = await screen.findByRole('button', { name: 'Retirar mi dinero' });
+
+      expect(boton.props.accessibilityState.disabled).toBe(true);
+      expect(screen.getByText(/Por seguridad podrás retirar a partir del/)).toBeTruthy();
+    });
+
+    it('sin recuperación no hay espera', async () => {
+      await abrir(async () => enMiTurno());
+
+      const boton = await screen.findByRole('button', { name: 'Retirar mi dinero' });
+
+      expect(boton.props.accessibilityState.disabled).not.toBe(true);
+    });
+  });
+
+  describe('solicitud de recuperación de alguien del círculo', () => {
+    const verSolicitud = () => screen.getByRole('button', { name: /perdió su teléfono y pide volver a entrar/ });
+
+    it('sin solicitud pendiente no hay aviso', async () => {
+      await abrir();
+      await screen.findByText('Los del mercado');
+
+      expect(screen.queryByText(/perdió su teléfono/)).toBeNull();
+    });
+
+    it('con una solicitud pendiente avisa en Mi círculo', async () => {
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+
+      expect(await screen.findByText(/perdió su teléfono y\s+pide volver a entrar/)).toBeTruthy();
+    });
+
+    it('al tocarla abre la pantalla del grupo, sin la barra de pestañas', async () => {
+      await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(await screen.findByRole('button', { name: /perdió su teléfono y pide volver a entrar/ }));
+
+      expect(screen.getByRole('button', { name: 'Sí, es Julio' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'No reconozco a Julio' })).toBeTruthy();
+      expect(screen.queryByRole('tab', { name: 'Círculo' })).toBeNull();
+    });
+
+    it('al confirmar manda la respuesta, el aviso desaparece y se vuelve a Mi círculo', async () => {
+      const { recuperacion } = await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(await screen.findByRole('button', { name: /perdió su teléfono y pide volver a entrar/ }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Sí, es Julio' }));
+
+      expect(recuperacion.responderSolicitud).toHaveBeenCalledWith('solicitud-julio', 'confirmo');
+      expect(await screen.findByText('Los del mercado')).toBeTruthy();
+      expect(screen.queryByText(/perdió su teléfono y\s+pide volver a entrar/)).toBeNull();
+      expect(screen.getByRole('tab', { name: 'Círculo' })).toBeTruthy();
+    });
+
+    it('al decir que no lo reconoce manda el rechazo', async () => {
+      const { recuperacion } = await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(await screen.findByRole('button', { name: /perdió su teléfono y pide volver a entrar/ }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'No reconozco a Julio' }));
+
+      expect(recuperacion.responderSolicitud).toHaveBeenCalledWith('solicitud-julio', 'no-lo-reconozco');
+      expect(await screen.findByText('Los del mercado')).toBeTruthy();
+    });
+
+    it('si falla la respuesta se queda en la pantalla y la solicitud sigue pendiente', async () => {
+      const { recuperacion } = await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      (recuperacion.responderSolicitud as jest.Mock).mockRejectedValueOnce(new Error('sin conexión'));
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(await screen.findByRole('button', { name: /perdió su teléfono y pide volver a entrar/ }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Sí, es Julio' }));
+
+      expect(await screen.findByText(/No pudimos mandar tu respuesta/)).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Sí, es Julio' })).toBeTruthy();
+    });
+
+    it('el botón de atrás de Android cierra la pantalla sin responder', async () => {
+      let atras: Parameters<typeof BackHandler.addEventListener>[1] = () => false;
+      const espia = jest
+        .spyOn(BackHandler, 'addEventListener')
+        .mockImplementation((_evento, manejador) => {
+          atras = manejador;
+          return { remove: jest.fn() };
+        });
+      const { recuperacion } = await abrir(undefined, undefined, undefined, undefined, solicitudDeEjemplo());
+      await screen.findByText('Los del mercado');
+      await fireEvent.press(await screen.findByRole('button', { name: /perdió su teléfono y pide volver a entrar/ }));
+
+      await act(async () => {
+        expect(atras({} as never)).toBe(true);
+      });
+
+      expect(await screen.findByText('Los del mercado')).toBeTruthy();
+      expect(recuperacion.responderSolicitud).not.toHaveBeenCalled();
+      expect(verSolicitud()).toBeTruthy();
       espia.mockRestore();
     });
   });

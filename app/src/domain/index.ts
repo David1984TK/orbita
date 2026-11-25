@@ -13,6 +13,7 @@ export {
 } from './codigo';
 export {
   fechaDeHoy,
+  fechaLocalDe,
   formatearFecha,
   formatearFechaConDia,
   formatearMonto,
@@ -30,9 +31,29 @@ export {
   COMISION_ORBITA,
   PORCENTAJE_COMISION_ORBITA,
   desgloseDeRetiro,
+  esperaDeRetiro,
+  ponerEsperaDeRetiro,
   puedeRetirar,
   registrarRetiro,
+  retiroEnEspera,
 } from './retiro';
+export {
+  CONFIRMACIONES_NECESARIAS,
+  DIAS_SIN_RESPUESTA,
+  HORAS_SIN_RETIRAR,
+  PERSONAS_QUE_CONFIRMAN,
+  detalleDeConfirmacion,
+  etiquetaDeConfirmacion,
+  formatearHace,
+  formatearHaceMeses,
+  resumenDeConfirmaciones,
+  textoDeFaltantes,
+} from './recuperacion';
+export type {
+  Confirmacion,
+  EstadoDeConfirmacion,
+  ResumenDeConfirmaciones,
+} from './recuperacion';
 export type { DesgloseDeRetiro } from './retiro';
 export {
   etiquetaDeEstado,

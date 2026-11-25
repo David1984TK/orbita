@@ -23,6 +23,8 @@ type Props = {
    * sin espacios ni lada del país. Ejemplo: "5512345678".
    */
   onContinuar: (telefono: string) => void;
+  /** La persona perdió su teléfono y quiere recuperar el acceso. */
+  onRecuperar: () => void;
 };
 
 /**
@@ -32,7 +34,7 @@ type Props = {
  * siguiente paso (el código por WhatsApp) todavía no existe; esta pantalla solo
  * entrega el número limpio a quien la use.
  */
-export function LoginScreen({ onContinuar }: Props) {
+export function LoginScreen({ onContinuar, onRecuperar }: Props) {
   // Se guardan solo los dígitos. Lo que se ve en el campo ("55 1234 5678") se
   // calcula a partir de ellos, así el texto nunca puede quedar mal formado.
   const [digitos, setDigitos] = useState('');
@@ -100,6 +102,10 @@ export function LoginScreen({ onContinuar }: Props) {
           <Text style={estilos.legal}>
             Al continuar aceptas los Términos y el Aviso de Privacidad.
           </Text>
+
+          <Pressable onPress={onRecuperar} accessibilityRole="button" hitSlop={8}>
+            <Text style={estilos.recuperar}>Perdí mi teléfono</Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -186,6 +192,13 @@ const estilos = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  recuperar: {
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.cobalto,
+    paddingVertical: 4,
   },
   legal: {
     fontSize: 12.5,

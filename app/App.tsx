@@ -6,11 +6,13 @@ import { IdentidadScreen } from './src/screens/IdentidadScreen';
 import { LlaveScreen } from './src/screens/LlaveScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { PrincipalScreen } from './src/screens/PrincipalScreen';
+import { RecuperarFlow } from './src/screens/RecuperarFlow';
 import { crearAportes } from './src/servicios/aportes';
 import { crearCirculos } from './src/servicios/circulos';
 import { crearHistoriales } from './src/servicios/historial';
 import { crearIdentidad } from './src/servicios/identidad';
 import { crearLlave } from './src/servicios/llave';
+import { crearRecuperacion } from './src/servicios/recuperacion';
 import { crearRetiros } from './src/servicios/retiros';
 import { crearVerificacion } from './src/servicios/verificacion';
 
@@ -21,6 +23,7 @@ type Paso =
   | { nombre: 'codigo'; telefono: string }
   | { nombre: 'llave'; telefono: string }
   | { nombre: 'identidad' }
+  | { nombre: 'recuperar' }
   | { nombre: 'principal' };
 
 export default function App() {
@@ -31,7 +34,10 @@ export default function App() {
   const aportes = useMemo(() => crearAportes(), []);
   const retiros = useMemo(() => crearRetiros(), []);
   const historiales = useMemo(() => crearHistoriales(), []);
+  const recuperacion = useMemo(() => crearRecuperacion(), []);
   const [paso, setPaso] = useState<Paso>({ nombre: 'telefono' });
+  // Si la persona recuperó su acceso: hasta cuándo no puede retirar dinero.
+  const [retiroCongeladoHasta, setRetiroCongeladoHasta] = useState<string | undefined>();
 
   return (
     <SafeAreaProvider>
@@ -43,6 +49,7 @@ export default function App() {
             verificacion.enviarCodigo(telefono).catch(() => {});
             setPaso({ nombre: 'codigo', telefono });
           }}
+          onRecuperar={() => setPaso({ nombre: 'recuperar' })}
         />
       )}
 
@@ -89,12 +96,29 @@ export default function App() {
         />
       )}
 
-      {paso.nombre === 'principal' && <PrincipalScreen
+      {paso.nombre === 'recuperar' && (
+        <RecuperarFlow
+          verificacion={verificacion}
+          llave={llave}
+          recuperacion={recuperacion}
+          onCancelar={() => setPaso({ nombre: 'telefono' })}
+          onTerminar={(resumen) => {
+            setRetiroCongeladoHasta(resumen.retiroCongeladoHasta);
+            setPaso({ nombre: 'principal' });
+          }}
+        />
+      )}
+
+      {paso.nombre === 'principal' && (
+        <PrincipalScreen
           circulos={circulos}
           aportes={aportes}
           retiros={retiros}
           historiales={historiales}
-        />}
+          recuperacion={recuperacion}
+          retiroCongeladoHasta={retiroCongeladoHasta}
+        />
+      )}
 
       <StatusBar style="dark" />
     </SafeAreaProvider>

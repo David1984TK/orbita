@@ -4,14 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarraPestanas } from '../components/BarraPestanas';
 import type { Pestana } from '../components/BarraPestanas';
 import { PantallaProvisional } from '../components/PantallaProvisional';
-import { registrarAporte, registrarRetiro } from '../domain';
+import { ponerEsperaDeRetiro, registrarAporte, registrarRetiro } from '../domain';
 import type { BorradorDeCirculo, MiCirculo } from '../domain';
 import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
 import type { Historiales } from '../servicios/historial';
+import type { Recuperacion, RespuestaASolicitud, SolicitudDeRecuperacion } from '../servicios/recuperacion';
 import type { Retiros } from '../servicios/retiros';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
+import { ConfirmarIdentidadScreen } from './ConfirmarIdentidadScreen';
 import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
 import { NuevoCirculoScreen } from './NuevoCirculoScreen';
@@ -24,15 +26,22 @@ type Props = {
   aportes: Aportes;
   retiros: Retiros;
   historiales: Historiales;
+  recuperacion: Recuperacion;
+  /**
+   * Si la persona acaba de recuperar su acceso: hasta cuándo no puede retirar
+   * dinero (fecha y hora ISO). Se aplica al círculo al cargarlo, mientras el
+   * servidor no lo entregue ya con la espera.
+   */
+  retiroCongeladoHasta?: string;
 };
 
 /**
  * La pantalla de la pestaña o uno de los pasos cortos que se abren encima:
- * aportar y retirar (desde "Círculo") y crear un círculo (desde la pantalla
- * vacía o desde "Grupo"). "invitar" es el paso que sigue a crear: todavía no
- * existe.
+ * aportar, retirar y responder a una solicitud de recuperación (desde "Círculo")
+ * y crear un círculo (desde la pantalla vacía o desde "Grupo"). "invitar" es el
+ * paso que sigue a crear: todavía no existe.
  */
-type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'invitar';
+type Vista = 'inicio' | 'aportar' | 'retirar' | 'crear' | 'invitar' | 'solicitud';
 
 type Carga =
   | { tipo: 'cargando' }
@@ -51,11 +60,19 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
  * retira o se crea un círculo no se ve la barra de pestañas: son pasos cortos
  * que se confirman o se cancelan.
  */
-export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Props) {
+export function PrincipalScreen({
+  circulos,
+  aportes,
+  retiros,
+  historiales,
+  recuperacion,
+  retiroCongeladoHasta,
+}: Props) {
   const [pestana, setPestana] = useState<Pestana>('circulo');
   const [vista, setVista] = useState<Vista>('inicio');
   const [carga, setCarga] = useState<Carga>({ tipo: 'cargando' });
   const [creado, setCreado] = useState('');
+  const [solicitud, setSolicitud] = useState<SolicitudDeRecuperacion | null>(null);
 
   const cargar = useCallback(() => {
     let cancelado = false;
@@ -64,7 +81,17 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
       .obtenerMiCirculo()
       .then((miCirculo) => {
         if (!cancelado) {
-          setCarga(miCirculo === null ? { tipo: 'sinCirculo' } : { tipo: 'listo', miCirculo });
+          if (miCirculo === null) {
+            setCarga({ tipo: 'sinCirculo' });
+          } else if (retiroCongeladoHasta !== undefined) {
+            const { circulo, yoId } = miCirculo;
+            setCarga({
+              tipo: 'listo',
+              miCirculo: { circulo: ponerEsperaDeRetiro(circulo, yoId, retiroCongeladoHasta), yoId },
+            });
+          } else {
+            setCarga({ tipo: 'listo', miCirculo });
+          }
         }
       })
       .catch(() => {
@@ -75,9 +102,26 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
     return () => {
       cancelado = true;
     };
-  }, [circulos]);
+  }, [circulos, retiroCongeladoHasta]);
 
   useEffect(() => cargar(), [cargar]);
+
+  // Si alguien del círculo perdió su teléfono y espera confirmación, se avisa en
+  // "Mi círculo". Si no se puede consultar, simplemente no hay aviso.
+  useEffect(() => {
+    let cancelado = false;
+    recuperacion
+      .obtenerSolicitudPendiente()
+      .then((pendiente) => {
+        if (!cancelado) {
+          setSolicitud(pendiente);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [recuperacion]);
 
   // En Android el botón de atrás cierra el paso corto en vez de salirse de la app.
   useEffect(() => {
@@ -99,7 +143,7 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
   const paso: Vista =
     vista === 'crear' || vista === 'invitar'
       ? vista
-      : (vista === 'aportar' || vista === 'retirar') &&
+      : (vista === 'aportar' || vista === 'retirar' || vista === 'solicitud') &&
           pestana === 'circulo' &&
           carga.tipo === 'listo'
         ? vista
@@ -141,6 +185,15 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
     return resultado;
   }
 
+  async function responderSolicitud(respuesta: RespuestaASolicitud) {
+    if (solicitud === null) {
+      return;
+    }
+    await recuperacion.responderSolicitud(solicitud.id, respuesta);
+    setSolicitud(null);
+    setVista('inicio');
+  }
+
   function cambiarPestana(nueva: Pestana) {
     setPestana(nueva);
     setVista('inicio');
@@ -161,6 +214,10 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
             texto={`Tu círculo «${creado}» se creó (simulado). Aquí va la invitación por WhatsApp. Todavía no existe.`}
             onVolver={() => setVista('inicio')}
           />
+        )}
+
+        {paso === 'solicitud' && solicitud !== null && (
+          <ConfirmarIdentidadScreen solicitud={solicitud} onResponder={responderSolicitud} />
         )}
 
         {paso === 'aportar' && carga.tipo === 'listo' && (
@@ -206,6 +263,8 @@ export function PrincipalScreen({ circulos, aportes, retiros, historiales }: Pro
             miCirculo={carga.miCirculo}
             onAportar={() => setVista('aportar')}
             onRetirar={() => setVista('retirar')}
+            solicitud={solicitud}
+            onVerSolicitud={() => setVista('solicitud')}
           />
         )}
 

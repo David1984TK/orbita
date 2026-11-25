@@ -14,9 +14,10 @@ type Cambios = {
   miTurno?: number;
   miEstado?: EstadoPago;
   misCuotas?: number;
+  retiroHasta?: string;
 };
 
-function miCirculo({ semanaActual, miTurno, miEstado, misCuotas }: Cambios = {}): MiCirculo {
+function miCirculo({ semanaActual, miTurno, miEstado, misCuotas, retiroHasta }: Cambios = {}): MiCirculo {
   const base = circuloDeEjemplo();
   const yoAntes = base.circulo.integrantes.find((i) => i.id === base.yoId)!;
   const turnoDestino = miTurno ?? yoAntes.turno;
@@ -33,6 +34,7 @@ function miCirculo({ semanaActual, miTurno, miEstado, misCuotas }: Cambios = {})
             turno: turnoDestino,
             estado: miEstado ?? i.estado,
             cuotasPagadas: misCuotas ?? i.cuotasPagadas,
+            retiroCongeladoHasta: retiroHasta,
           };
         }
         return i.turno === turnoDestino ? { ...i, turno: yoAntes.turno } : i;
@@ -41,11 +43,16 @@ function miCirculo({ semanaActual, miTurno, miEstado, misCuotas }: Cambios = {})
   };
 }
 
-async function abrir(cambios: Cambios = {}) {
+async function abrir(cambios: Cambios = {}, ahora?: Date) {
   const onAportar = jest.fn();
   const onRetirar = jest.fn();
   await render(
-    <InicioScreen miCirculo={miCirculo(cambios)} onAportar={onAportar} onRetirar={onRetirar} />,
+    <InicioScreen
+      miCirculo={miCirculo(cambios)}
+      onAportar={onAportar}
+      onRetirar={onRetirar}
+      ahora={ahora}
+    />,
   );
   return { onAportar, onRetirar };
 }
@@ -173,6 +180,49 @@ describe('InicioScreen', () => {
       expect(
         screen.getByText('Ya aportaste esta semana · La siguiente vence el lunes 7 de diciembre'),
       ).toBeTruthy();
+    });
+  });
+
+  describe('en la espera de seguridad de después de recuperar el acceso', () => {
+    const hasta = '2026-11-27T12:00:00Z';
+    const durante = new Date('2026-11-25T12:00:00Z');
+    const despues = new Date('2026-11-28T12:00:00Z');
+
+    it('en mi turno el retiro se apaga y dice hasta cuándo', async () => {
+      const { onRetirar } = await abrir({ miTurno: 6, retiroHasta: hasta }, durante);
+
+      const boton = screen.getByRole('button', { name: 'Retirar mi dinero' });
+      await fireEvent.press(boton);
+
+      expect(boton.props.accessibilityState.disabled).toBe(true);
+      expect(onRetirar).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('Por seguridad podrás retirar a partir del viernes 27 de noviembre'),
+      ).toBeTruthy();
+    });
+
+    it('aun en la espera se puede aportar la cuota', async () => {
+      const { onAportar } = await abrir({ miTurno: 6, retiroHasta: hasta }, durante);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Aportar mi cuota' }));
+
+      expect(onAportar).toHaveBeenCalledTimes(1);
+    });
+
+    it('cuando la espera termina se puede retirar otra vez', async () => {
+      const { onRetirar } = await abrir({ miTurno: 6, retiroHasta: hasta }, despues);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Retirar mi dinero' }));
+
+      expect(onRetirar).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/Por seguridad podrás retirar/)).toBeNull();
+    });
+
+    it('si no es mi turno no hay botón de retiro ni aviso de espera', async () => {
+      await abrir({ miTurno: 9, retiroHasta: hasta }, durante);
+
+      expect(screen.queryByRole('button', { name: 'Retirar mi dinero' })).toBeNull();
+      expect(screen.queryByText(/Por seguridad podrás retirar/)).toBeNull();
     });
   });
 });

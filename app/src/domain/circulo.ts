@@ -33,6 +33,12 @@ export type Integrante = {
   diasDeAtraso?: number;
   /** `true` si ya retiró el bote de su turno. Si falta, se entiende que no. */
   yaRetiro?: boolean;
+  /**
+   * Hasta cuándo no puede retirar dinero, como una fecha y hora ISO
+   * ("2026-11-27T21:00:00Z"). Pasa tras recuperar el acceso: 72 horas de espera
+   * por seguridad. Si falta, no hay espera.
+   */
+  retiroCongeladoHasta?: string;
 };
 
 export type Circulo = {

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Progreso } from '../components/Progreso';
 import { colors } from '../theme';
 
 type Props = {
@@ -37,18 +38,7 @@ export function IdentidadScreen({ onTomarFoto }: Props) {
             </Text>
           </View>
 
-          <View
-            style={estilos.progreso}
-            accessible
-            accessibilityLabel={`Paso ${PASO_ACTUAL + 1} de ${PASOS.length}`}
-          >
-            {PASOS.map((paso, i) => (
-              <View
-                key={paso.titulo}
-                style={[estilos.segmento, i <= PASO_ACTUAL && estilos.segmentoActivo]}
-              />
-            ))}
-          </View>
+          <Progreso actual={PASO_ACTUAL + 1} total={PASOS.length} />
 
           <View style={estilos.tarjeta}>
             {PASOS.map((paso, i) => {
@@ -125,20 +115,6 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     color: colors.textoSecundario,
-  },
-  progreso: {
-    flexDirection: 'row',
-    gap: 6,
-    alignSelf: 'center',
-  },
-  segmento: {
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.linea,
-  },
-  segmentoActivo: {
-    backgroundColor: colors.cobalto,
   },
   tarjeta: {
     borderRadius: 12,

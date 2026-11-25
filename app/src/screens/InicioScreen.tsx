@@ -4,15 +4,18 @@ import { Rueda } from '../components/Rueda';
 import {
   boteDelCirculo,
   fechaDeSemana,
+  fechaLocalDe,
   formatearFecha,
   formatearFechaConDia,
   formatearMonto,
   puedeRetirar,
   resumenDeAportes,
   resumenDeMiTurno,
+  retiroEnEspera,
   segmentosDeLaRueda,
 } from '../domain';
 import type { MiCirculo, ResumenDeMiTurno } from '../domain';
+import type { SolicitudDeRecuperacion } from '../servicios/recuperacion';
 import { colors } from '../theme';
 
 type Props = {
@@ -21,6 +24,12 @@ type Props = {
   onAportar: () => void;
   /** La persona quiere retirar el bote de su turno. */
   onRetirar: () => void;
+  /** Solo para pruebas: por defecto es el momento actual. */
+  ahora?: Date;
+  /** Alguien del círculo perdió su teléfono y espera que la persona lo confirme. */
+  solicitud?: SolicitudDeRecuperacion | null;
+  /** La persona quiere ver la solicitud para responderla. */
+  onVerSolicitud?: () => void;
 };
 
 function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
@@ -50,13 +59,21 @@ function textoDeMiTurno(resumen: ResumenDeMiTurno, total: number) {
  * Pantalla principal: "Mi círculo". Es la que se abre cien veces al día, así
  * que contesta de un vistazo en qué semana vamos y cuándo me toca.
  */
-export function InicioScreen({ miCirculo, onAportar, onRetirar }: Props) {
+export function InicioScreen({
+  miCirculo,
+  onAportar,
+  onRetirar,
+  ahora = new Date(),
+  solicitud = null,
+  onVerSolicitud,
+}: Props) {
   const { circulo, yoId } = miCirculo;
   const total = circulo.integrantes.length;
   const miTurno = textoDeMiTurno(resumenDeMiTurno(circulo, yoId), total);
   const aportes = resumenDeAportes(circulo, yoId);
   const hayOtraSemana = circulo.semanaActual < total;
-  const retirar = puedeRetirar(circulo, yoId);
+  const retirar = puedeRetirar(circulo, yoId, ahora);
+  const espera = retiroEnEspera(circulo, yoId, ahora);
   const siguiente = hayOtraSemana
     ? `La siguiente vence el ${formatearFechaConDia(fechaDeSemana(circulo, circulo.semanaActual + 1))}`
     : 'Fue la última cuota del círculo';
@@ -64,6 +81,22 @@ export function InicioScreen({ miCirculo, onAportar, onRetirar }: Props) {
   return (
     <SafeAreaView edges={['top']} style={estilos.pantalla}>
       <ScrollView contentContainerStyle={estilos.contenido}>
+        {solicitud !== null && (
+          // Un aviso que no se puede perder: si la notificación se pasó, aquí sigue.
+          <Pressable
+            onPress={onVerSolicitud}
+            accessibilityRole="button"
+            accessibilityLabel={`${solicitud.nombre} perdió su teléfono y pide volver a entrar. Toca para responder.`}
+            style={({ pressed }) => [estilos.solicitud, pressed && estilos.botonPresionado]}
+          >
+            <Text style={estilos.solicitudTexto}>
+              <Text style={estilos.solicitudNegrita}>{solicitud.nombre}</Text> perdió su teléfono y
+              pide volver a entrar. Toca para responder.
+            </Text>
+            <Text style={estilos.solicitudFlecha}>›</Text>
+          </Pressable>
+        )}
+
         <View style={estilos.encabezado}>
           <Text style={estilos.titulo} accessibilityRole="header">
             {circulo.nombre}
@@ -100,17 +133,31 @@ export function InicioScreen({ miCirculo, onAportar, onRetirar }: Props) {
       </ScrollView>
 
       <View style={estilos.pie}>
-        {retirar ? (
+        {retirar || espera !== null ? (
           // Es tu turno: retirar es lo principal. Si aún falta la cuota de esta
-          // semana, aportar queda a la mano como acción secundaria.
+          // semana, aportar queda a la mano como acción secundaria. Si estás en
+          // la espera de seguridad de después de recuperar el acceso, el botón
+          // se apaga y se dice hasta cuándo.
           <>
-            <Pressable
-              onPress={onRetirar}
-              accessibilityRole="button"
-              style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
-            >
-              <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
-            </Pressable>
+            {espera !== null ? (
+              <View
+                style={[estilos.boton, estilos.botonInactivo]}
+                accessible
+                accessibilityRole="button"
+                accessibilityState={{ disabled: true }}
+                accessibilityLabel="Retirar mi dinero"
+              >
+                <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={onRetirar}
+                accessibilityRole="button"
+                style={({ pressed }) => [estilos.boton, pressed && estilos.botonPresionado]}
+              >
+                <Text style={estilos.botonTexto}>Retirar mi dinero</Text>
+              </Pressable>
+            )}
             {!aportes.alDia && (
               <Pressable
                 onPress={onAportar}
@@ -119,6 +166,11 @@ export function InicioScreen({ miCirculo, onAportar, onRetirar }: Props) {
               >
                 <Text style={estilos.botonSecundarioTexto}>Aportar mi cuota</Text>
               </Pressable>
+            )}
+            {espera !== null && (
+              <Text style={estilos.nota}>
+                Por seguridad podrás retirar a partir del {formatearFechaConDia(fechaLocalDe(espera))}
+              </Text>
             )}
             <Text style={[estilos.nota, aportes.atrasada && estilos.notaAtrasada]}>
               {aportes.alDia
@@ -168,6 +220,28 @@ const estilos = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
     gap: 24,
+  },
+  solicitud: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: colors.cobaltoSuave,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  solicitudTexto: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.tinta,
+  },
+  solicitudNegrita: {
+    fontWeight: '700',
+  },
+  solicitudFlecha: {
+    fontSize: 24,
+    color: colors.cobalto,
   },
   encabezado: {
     gap: 6,

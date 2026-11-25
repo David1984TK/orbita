@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import App from './App';
 
 jest.mock('react-native-safe-area-context', () =>
@@ -94,5 +94,48 @@ describe('App: entrada', () => {
     await fireEvent.press(screen.getByRole('button', { name: /Confirmar con/ }));
 
     expect(await screen.findByText('Ya aportaste esta semana')).toBeTruthy();
+  });
+
+  describe('Perdí mi teléfono', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('desde el inicio abre la recuperación y se puede cancelar', async () => {
+      await render(<App />);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Perdí mi teléfono' }));
+      expect(screen.getByText('Recuperar mi acceso')).toBeTruthy();
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Volver' }));
+      expect(screen.getByText('Tu ahorro en grupo, sin que nadie tenga que guardarlo.')).toBeTruthy();
+    });
+
+    it('de punta a punta: recupera el acceso y entra a su círculo con el retiro en espera', async () => {
+      jest.useFakeTimers();
+      await render(<App />);
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Perdí mi teléfono' }));
+      await fireEvent.changeText(
+        screen.getByLabelText('Número de teléfono celular, 10 dígitos'),
+        '5598765432',
+      );
+      await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+      await fireEvent.changeText(screen.getByLabelText('Código de 6 dígitos'), '123456');
+      await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
+      await fireEvent.press(await screen.findByRole('button', { name: 'Empezar' }));
+
+      // La primera consulta trae una confirmación de tres; la siguiente, la segunda.
+      expect(await screen.findByText('Falta una confirmación.')).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      await fireEvent.press(await screen.findByRole('button', { name: /Activar/ }));
+      expect(await screen.findByText('Recuperaste tu acceso')).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: 'Entrar a mi círculo' }));
+
+      expect(await screen.findByText('Los del mercado')).toBeTruthy();
+    });
   });
 });

@@ -11,9 +11,11 @@ const ETIQUETA_CAMPO = 'Número de teléfono celular, 10 dígitos';
 
 async function abrirPantalla() {
   const onContinuar = jest.fn();
-  await render(<LoginScreen onContinuar={onContinuar} />);
+  const onRecuperar = jest.fn();
+  await render(<LoginScreen onContinuar={onContinuar} onRecuperar={onRecuperar} />);
   return {
     onContinuar,
+    onRecuperar,
     campo: screen.getByLabelText(ETIQUETA_CAMPO),
     boton: screen.getByRole('button', { name: 'Continuar' }),
   };
@@ -81,6 +83,15 @@ describe('LoginScreen', () => {
     await fireEvent.changeText(campo, '5512');
     await fireEvent(campo, 'submitEditing');
 
+    expect(onContinuar).not.toHaveBeenCalled();
+  });
+
+  it('"Perdí mi teléfono" abre la recuperación del acceso, sin pedir el número', async () => {
+    const { onContinuar, onRecuperar } = await abrirPantalla();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Perdí mi teléfono' }));
+
+    expect(onRecuperar).toHaveBeenCalledTimes(1);
     expect(onContinuar).not.toHaveBeenCalled();
   });
 });

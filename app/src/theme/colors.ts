@@ -30,6 +30,13 @@ export const colors = {
   alDiaSuave: 'rgba(36, 138, 61, 0.12)', // fondo de la etiqueta "Al día"
   atrasado: '#D70015',
   atrasadoSuave: 'rgba(215, 0, 21, 0.10)', // fondo de la etiqueta "N días tarde"
+  precaucionSuave: 'rgba(150, 80, 40, 0.12)', // fondo de un aviso de seguridad
+
+  // Pantalla del grupo que confirma a quien recuperó su acceso (modo oscuro)
+  noche: '#1B2140',
+  nocheTarjeta: 'rgba(255, 255, 255, 0.07)',
+  nocheTexto: 'rgba(255, 255, 255, 0.62)',
+  nocheRechazo: '#FF6B6B',
 } as const;
 
 export type NombreColor = keyof typeof colors;

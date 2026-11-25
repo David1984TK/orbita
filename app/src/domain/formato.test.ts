@@ -1,5 +1,6 @@
 import {
   fechaDeHoy,
+  fechaLocalDe,
   formatearFecha,
   formatearFechaConDia,
   formatearMonto,
@@ -93,5 +94,11 @@ describe('fechaDeHoy', () => {
     jest.setSystemTime(new Date(2026, 10, 24, 23, 30));
 
     expect(fechaDeHoy()).toBe('2026-11-24');
+  });
+});
+
+describe('fechaLocalDe', () => {
+  it('da la fecha local de un instante, con ceros', () => {
+    expect(fechaLocalDe(new Date(2027, 2, 9, 8, 0))).toBe('2027-03-09');
   });
 });

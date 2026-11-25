@@ -52,20 +52,46 @@ export function desgloseDeRetiro(bote: number, moneda: Moneda): DesgloseDeRetiro
   };
 }
 
-/**
- * ¿Se le ofrece retirar a esta persona? Solo en la semana de su turno, si aún
- * no retiró, si el círculo es en pesos y si después de las comisiones le queda
- * algo.
- *
- * Qué pasa con quien no retira en su semana (¿sigue disponible?, ¿se acumula?)
- * lo decide el contrato; mientras tanto no se ofrece.
- */
-export function puedeRetirar(circulo: Circulo, yoId: string): boolean {
+/** Todo lo que se pide para retirar, salvo la espera de seguridad. */
+function esMomentoDeRetirar(circulo: Circulo, yoId: string): boolean {
   const yo = miIntegrante(circulo, yoId);
   if (yo.turno !== circulo.semanaActual || yo.yaRetiro === true || circulo.moneda !== 'pesos') {
     return false;
   }
   return desgloseDeRetiro(boteDelCirculo(circulo), circulo.moneda).recibes > 0;
+}
+
+/**
+ * Hasta cuándo no puede retirar la persona, si ahora mismo está en la espera de
+ * seguridad que sigue a recuperar el acceso. `null` si no hay espera (o ya pasó).
+ */
+export function esperaDeRetiro(circulo: Circulo, yoId: string, ahora: Date = new Date()): Date | null {
+  const hasta = miIntegrante(circulo, yoId).retiroCongeladoHasta;
+  if (hasta === undefined) {
+    return null;
+  }
+  const fecha = new Date(hasta);
+  return fecha.getTime() > ahora.getTime() ? fecha : null;
+}
+
+/**
+ * ¿Se le ofrece retirar a esta persona? Solo en la semana de su turno, si aún
+ * no retiró, si el círculo es en pesos, si después de las comisiones le queda
+ * algo y si no está en la espera de seguridad de después de recuperar el acceso.
+ *
+ * Qué pasa con quien no retira en su semana (¿sigue disponible?, ¿se acumula?)
+ * lo decide el contrato; mientras tanto no se ofrece.
+ */
+export function puedeRetirar(circulo: Circulo, yoId: string, ahora: Date = new Date()): boolean {
+  return esMomentoDeRetirar(circulo, yoId) && esperaDeRetiro(circulo, yoId, ahora) === null;
+}
+
+/**
+ * Si es su momento de retirar pero la espera de seguridad se lo impide, hasta
+ * cuándo. `null` en cualquier otro caso.
+ */
+export function retiroEnEspera(circulo: Circulo, yoId: string, ahora: Date = new Date()): Date | null {
+  return esMomentoDeRetirar(circulo, yoId) ? esperaDeRetiro(circulo, yoId, ahora) : null;
 }
 
 /**
@@ -81,6 +107,21 @@ export function registrarRetiro(circulo: Circulo, yoId: string): Circulo {
     ...circulo,
     integrantes: circulo.integrantes.map((integrante) =>
       integrante.id === yoId ? { ...integrante, yaRetiro: true } : integrante,
+    ),
+  };
+}
+
+/**
+ * El círculo con la espera de seguridad puesta a `yoId`: no puede retirar hasta
+ * `hasta` (fecha y hora ISO). No modifica el original. Es lo que se aplica al
+ * recuperar el acceso, mientras el servidor no entregue el círculo ya con ella.
+ */
+export function ponerEsperaDeRetiro(circulo: Circulo, yoId: string, hasta: string): Circulo {
+  miIntegrante(circulo, yoId);
+  return {
+    ...circulo,
+    integrantes: circulo.integrantes.map((integrante) =>
+      integrante.id === yoId ? { ...integrante, retiroCongeladoHasta: hasta } : integrante,
     ),
   };
 }

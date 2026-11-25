@@ -3,9 +3,12 @@ import {
   COMISION_DE_RETIRO,
   COMISION_ORBITA,
   desgloseDeRetiro,
+  esperaDeRetiro,
   PORCENTAJE_COMISION_ORBITA,
+  ponerEsperaDeRetiro,
   puedeRetirar,
   registrarRetiro,
+  retiroEnEspera,
 } from './retiro';
 import { resumenDeMiTurno } from './rueda';
 
@@ -54,6 +57,7 @@ function circulo(opciones: {
   semanaActual?: number;
   miTurno?: number;
   yaRetiro?: boolean;
+  congeladoHasta?: string;
   moneda?: Moneda;
   cuota?: number;
   integrantes?: number;
@@ -62,6 +66,7 @@ function circulo(opciones: {
     semanaActual = 6,
     miTurno = 6,
     yaRetiro,
+    congeladoHasta,
     moneda = 'pesos',
     cuota = 600,
     integrantes = 15,
@@ -80,6 +85,7 @@ function circulo(opciones: {
       estado: 'alDia' as const,
       cuotasPagadas: semanaActual,
       yaRetiro: i + 1 === miTurno ? yaRetiro : undefined,
+      retiroCongeladoHasta: i + 1 === miTurno ? congeladoHasta : undefined,
     })),
   };
 }
@@ -141,5 +147,73 @@ describe('registrarRetiro', () => {
 
   it('lanza un error si la persona no está en el círculo', () => {
     expect(() => registrarRetiro(circulo(), 'nadie')).toThrow(/nadie/);
+  });
+});
+
+describe('la espera de seguridad tras recuperar el acceso', () => {
+  const congelado = '2026-11-27T21:00:00Z';
+  const antes = new Date('2026-11-25T12:00:00Z');
+  const despues = new Date('2026-11-28T12:00:00Z');
+
+  it('mientras dura no se puede retirar, aunque sea mi turno', () => {
+    expect(puedeRetirar(circulo({ congeladoHasta: congelado }), 'yo', antes)).toBe(false);
+  });
+
+  it('cuando pasa, se puede retirar otra vez', () => {
+    expect(puedeRetirar(circulo({ congeladoHasta: congelado }), 'yo', despues)).toBe(true);
+  });
+
+  it('sin espera no cambia nada', () => {
+    expect(puedeRetirar(circulo(), 'yo', antes)).toBe(true);
+    expect(esperaDeRetiro(circulo(), 'yo', antes)).toBeNull();
+  });
+
+  it('dice hasta cuándo dura la espera, y deja de decirlo al pasar', () => {
+    expect(esperaDeRetiro(circulo({ congeladoHasta: congelado }), 'yo', antes)).toEqual(
+      new Date(congelado),
+    );
+    expect(esperaDeRetiro(circulo({ congeladoHasta: congelado }), 'yo', despues)).toBeNull();
+  });
+
+  it('justo en el instante en que termina ya no hay espera', () => {
+    expect(esperaDeRetiro(circulo({ congeladoHasta: congelado }), 'yo', new Date(congelado))).toBeNull();
+  });
+
+  it('retiroEnEspera avisa solo si la espera es lo único que impide retirar', () => {
+    expect(retiroEnEspera(circulo({ congeladoHasta: congelado }), 'yo', antes)).toEqual(
+      new Date(congelado),
+    );
+    // No es mi turno: la espera no es lo que me impide retirar.
+    expect(
+      retiroEnEspera(circulo({ congeladoHasta: congelado, miTurno: 9 }), 'yo', antes),
+    ).toBeNull();
+    // Ya retiré: tampoco.
+    expect(
+      retiroEnEspera(circulo({ congeladoHasta: congelado, yaRetiro: true }), 'yo', antes),
+    ).toBeNull();
+    expect(retiroEnEspera(circulo(), 'yo', antes)).toBeNull();
+  });
+});
+
+describe('ponerEsperaDeRetiro', () => {
+  const hasta = '2026-11-27T21:00:00Z';
+
+  it('deja a la persona en espera hasta esa fecha', () => {
+    const despues = ponerEsperaDeRetiro(circulo(), 'yo', hasta);
+
+    expect(puedeRetirar(despues, 'yo', new Date('2026-11-25T12:00:00Z'))).toBe(false);
+    expect(puedeRetirar(despues, 'yo', new Date('2026-11-28T12:00:00Z'))).toBe(true);
+  });
+
+  it('no toca a las demás ni modifica el círculo original', () => {
+    const antes = circulo();
+    const despues = ponerEsperaDeRetiro(antes, 'yo', hasta);
+
+    expect(despues.integrantes.filter((i) => i.retiroCongeladoHasta !== undefined)).toHaveLength(1);
+    expect(antes.integrantes.find((i) => i.id === 'yo')?.retiroCongeladoHasta).toBeUndefined();
+  });
+
+  it('lanza un error si la persona no está en el círculo', () => {
+    expect(() => ponerEsperaDeRetiro(circulo(), 'nadie', hasta)).toThrow(/nadie/);
   });
 });

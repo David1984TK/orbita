@@ -81,10 +81,14 @@ export function formatearMonto(
   return `${signo}${simbolo}${conComas}${centavos !== undefined ? `.${centavos}` : ''}`;
 }
 
+/** Una fecha y hora, como "AAAA-MM-DD" en la hora local del teléfono (no la UTC). */
+export function fechaLocalDe(instante: Date): string {
+  const mes = String(instante.getMonth() + 1).padStart(2, '0');
+  const dia = String(instante.getDate()).padStart(2, '0');
+  return `${instante.getFullYear()}-${mes}-${dia}`;
+}
+
 /** La fecha de hoy en el teléfono, como "AAAA-MM-DD" (con la hora local, no la UTC). */
 export function fechaDeHoy(): string {
-  const hoy = new Date();
-  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-  const dia = String(hoy.getDate()).padStart(2, '0');
-  return `${hoy.getFullYear()}-${mes}-${dia}`;
+  return fechaLocalDe(new Date());
 }
