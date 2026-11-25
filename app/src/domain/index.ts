@@ -25,6 +25,15 @@ export {
 } from './aporte';
 export type { DesgloseDeAporte } from './aporte';
 export {
+  etiquetaDeEstado,
+  iniciales,
+  integrantesOrdenados,
+  quienCobra,
+  resumenDelGrupo,
+  textoDelResumen,
+} from './grupo';
+export type { ResumenDelGrupo, TonoDeEstado } from './grupo';
+export {
   fechaDeSemana,
   miIntegrante,
   resumenDeAportes,

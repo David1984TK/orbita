@@ -27,7 +27,9 @@ export const colors = {
 
   // Estados de los integrantes del grupo
   alDia: '#248A3D',
+  alDiaSuave: 'rgba(36, 138, 61, 0.12)', // fondo de la etiqueta "Al día"
   atrasado: '#D70015',
+  atrasadoSuave: 'rgba(215, 0, 21, 0.10)', // fondo de la etiqueta "N días tarde"
 } as const;
 
 export type NombreColor = keyof typeof colors;

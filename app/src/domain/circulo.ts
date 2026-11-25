@@ -26,6 +26,11 @@ export type Integrante = {
   estado: EstadoPago;
   /** Cuántas cuotas lleva aportadas en total, de las `integrantes.length`. */
   cuotasPagadas: number;
+  /**
+   * Días que lleva de atraso. Solo tiene sentido cuando `estado` es
+   * `atrasado`; si falta, se muestra un "Atrasado" sin número.
+   */
+  diasDeAtraso?: number;
 };
 
 export type Circulo = {

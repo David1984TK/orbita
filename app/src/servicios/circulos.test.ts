@@ -7,7 +7,7 @@ describe('círculo de ejemplo (solo desarrollo)', () => {
 
     const turnos = circulo.integrantes.map((i) => i.turno).sort((a, b) => a - b);
     expect(turnos).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
-    expect(miIntegrante(circulo, yoId).nombre).toBe('Tú');
+    expect(miIntegrante(circulo, yoId).nombre).toBe('David Nava');
   });
 
   it('me toca más adelante y me falta pagar la cuota de esta semana', () => {

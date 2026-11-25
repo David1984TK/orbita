@@ -20,21 +20,21 @@ const NOMBRES = [
   'Lucía Ortega',
   'Pedro Salas',
   'Elena Vargas',
+  'Sergio Ramos',
   'Rosa Martínez',
   'Julio Lara',
   'Carmen Ruiz',
   'Miguel Gómez',
   'Ana Torres',
-  'Sergio Ramos',
   'Tere Aguilar',
-  'Tú',
+  'David Nava',
   'Beto Ibarra',
   'Paty Núñez',
   'Luis Cano',
 ];
 
 const SEMANA_ACTUAL = 6;
-const TURNO_DE_CARMEN = 7;
+const TURNO_DE_CARMEN = 8;
 const MI_TURNO = 12;
 
 /** Un círculo de ejemplo: 15 personas, $600 a la semana, en la semana 6. */
@@ -50,6 +50,7 @@ export function circuloDeEjemplo(): MiCirculo {
       // Yo todavía no pago esta semana; una integrante va atrasada.
       estado: soyYo ? 'pendiente' : atrasada ? 'atrasado' : 'alDia',
       cuotasPagadas: soyYo || atrasada ? SEMANA_ACTUAL - 1 : SEMANA_ACTUAL,
+      ...(atrasada ? { diasDeAtraso: 3 } : {}),
     };
   });
 

@@ -69,7 +69,8 @@ describe('PrincipalScreen', () => {
     await screen.findByText('Los del mercado');
 
     await fireEvent.press(pestana('Grupo'));
-    expect(screen.getByText(/Aquí va «El grupo»/)).toBeTruthy();
+    expect(screen.getByText('El grupo')).toBeTruthy();
+    expect(screen.getByText('LOS 15 INTEGRANTES')).toBeTruthy();
     expect(pestana('Grupo').props.accessibilityState.selected).toBe(true);
 
     await fireEvent.press(pestana('Perfil'));
@@ -156,5 +157,39 @@ describe('PrincipalScreen', () => {
 
     expect(screen.getByText('Se descuenta de tu cuenta')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('la pestaña Grupo muestra el mismo círculo cargado, sin volver a pedirlo', async () => {
+    const { circulos } = await abrir();
+    await screen.findByText('Los del mercado');
+
+    await fireEvent.press(pestana('Grupo'));
+
+    expect(screen.getByText('Semana 6 · 13 al día, 1 pendiente, 1 atrasado')).toBeTruthy();
+    expect(circulos.obtenerMiCirculo).toHaveBeenCalledTimes(1);
+  });
+
+  it('al aportar, la pestaña Grupo ya me ve al día', async () => {
+    await abrir();
+    await fireEvent.press(await screen.findByRole('button', { name: 'Aportar mi cuota' }));
+    await fireEvent.press(botonConfirmar());
+    await screen.findByText('Ya aportaste esta semana');
+
+    await fireEvent.press(pestana('Grupo'));
+
+    expect(screen.getByText('Semana 6 · 14 al día, 1 atrasado')).toBeTruthy();
+    expect(screen.getByLabelText('Tú, Turno 12, Al día')).toBeTruthy();
+  });
+
+  it('si no pudo cargar el círculo, también se avisa desde la pestaña Grupo', async () => {
+    await abrir(async () => {
+      throw new Error('sin conexión');
+    });
+    await screen.findByText(/No pudimos cargar tu círculo/);
+
+    await fireEvent.press(pestana('Grupo'));
+
+    expect(screen.getByText(/No pudimos cargar tu círculo/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
   });
 });

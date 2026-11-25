@@ -10,6 +10,7 @@ import type { Aportes } from '../servicios/aportes';
 import type { Circulos } from '../servicios/circulos';
 import { colors } from '../theme';
 import { AportarScreen } from './AportarScreen';
+import { GrupoScreen } from './GrupoScreen';
 import { InicioScreen } from './InicioScreen';
 
 type Props = {
@@ -27,8 +28,9 @@ const MENSAJE_ERROR = 'No pudimos cargar tu círculo. Revisa tu conexión e int�
 /**
  * La app una vez dentro: la barra de pestañas y la pantalla de cada una.
  *
- * Hoy solo existe "Círculo" (con "Aportar" dentro). "Grupo" y "Perfil" son
- * marcadores de lugar. Mientras se aporta no se ve la barra de pestañas: es un
+ * Existen "Círculo" (con "Aportar" dentro) y "Grupo". "Perfil" es un marcador
+ * de lugar. "Círculo" y "Grupo" leen el mismo círculo, así que comparten la
+ * carga y sus avisos. Mientras se aporta no se ve la barra de pestañas: es un
  * paso corto que se confirma o se cancela.
  */
 export function PrincipalScreen({ circulos, aportes }: Props) {
@@ -70,6 +72,9 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
     return () => suscripcion.remove();
   }, [aportando]);
 
+  // "Círculo" y "Grupo" se alimentan del mismo círculo.
+  const necesitaCirculo = pestana === 'circulo' || pestana === 'grupo';
+
   // Solo se llega a "Aportar" con el círculo ya cargado.
   const aportandoAhora = pestana === 'circulo' && aportando && carga.tipo === 'listo';
 
@@ -102,14 +107,14 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
           />
         )}
 
-        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'cargando' && (
+        {necesitaCirculo && !aportandoAhora && carga.tipo === 'cargando' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <ActivityIndicator color={colors.cobalto} />
             <Text style={estilos.mensaje}>Cargando tu círculo…</Text>
           </SafeAreaView>
         )}
 
-        {pestana === 'circulo' && !aportandoAhora && carga.tipo === 'error' && (
+        {necesitaCirculo && !aportandoAhora && carga.tipo === 'error' && (
           <SafeAreaView edges={['top']} style={estilos.centro}>
             <Text style={estilos.mensaje} accessibilityRole="alert">
               {MENSAJE_ERROR}
@@ -124,9 +129,7 @@ export function PrincipalScreen({ circulos, aportes }: Props) {
           <InicioScreen miCirculo={carga.miCirculo} onAportar={() => setAportando(true)} />
         )}
 
-        {pestana === 'grupo' && (
-          <PantallaProvisional texto="Aquí va «El grupo». Todavía no existe." />
-        )}
+        {pestana === 'grupo' && carga.tipo === 'listo' && <GrupoScreen miCirculo={carga.miCirculo} />}
 
         {pestana === 'perfil' && (
           <PantallaProvisional texto="Aquí va «Mi historial». Todavía no existe." />
